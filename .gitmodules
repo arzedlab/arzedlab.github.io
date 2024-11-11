@@ -1,0 +1,3 @@
+[submodule "themes/archine"]
+	path = themes/archine
+	url = https://github.com/athul/archie
