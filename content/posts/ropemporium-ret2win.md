@@ -1,6 +1,8 @@
 ---
-title: "ret2win"
+title: "ret2win | ROPEmporium [1]"
 date: 2024-11-11T11:41:24+05:00
+tldr: ROPEmporium - 1, ret2win task writeup
+toc: true
 summary: One common introductory ROP challenge is known as **ret2win**. The goal is to call a specific function in the program called `ret2win`, which prints a success message and reveal a flag.txt
 ---
 
@@ -19,21 +21,21 @@ Buffer
 
 1. To find out offset first we will generate cyclic pattern with 100 bytes
 
-![image.png](image%201.png)
+![image.png](image1.png)
 
 run the binary and put your generated cyclic payload into buffer, it overflows and responses with `SIGSEGV` 
 
 in that moment we go and check in which offset buffer ends and moves to registers RBP and to Return Address
 
-![image.png](image%202.png)
+![image.png](image2.png)
 
 This shows that to overwrite RBP, we need an offset of only 32 bytes, and to overwrite the saved RIP (or return address), we need an offset of 40 bytes.
 
 1. We can find the address of  `ret2win`  using the command `objdump -M intel -D ./binary | grep ret2win` 
 
-![image.png](image%203.png)
+![image.png](image3.png)
 
-Payload:
+## x64 - Payload
 
 ```python
 import struct
@@ -56,12 +58,11 @@ with open("payload", "wb") as f:
 print(f"Payload written to file. Length: {len(payload)} bytes")
 ```
 
-Flag: 
+## x64 - Result 
 
-![image.png](image%204.png)
+![image.png](image4.png)
 
-- Note
-    
+- ## Note
     `struct.pack("<Q", 0xdeadbeefdeadbeef)` converts the hexadecimal value into a binary representation using little-endian byte order.
     
     `<Q`  - For 64-bit little-endian
@@ -77,11 +78,11 @@ Flag:
 
 We will determine the offset required for overflowing the stack and then place our entire payload there, just as we did with an `ret2win`.
 
-![image.png](image%205.png)
+![image.png](image5.png)
 
-![image.png](image%206.png)
+![image.png](image6.png)
 
-Payload:
+## x86-32 - Payload
 
 ```livescript
 import struct
@@ -105,6 +106,6 @@ print(f"Payload length: {len(payload)} bytes")
 
  If you’re not using GDB with GEF, try reversing the binary and calculating the offset; this is often easier to accomplish with IDA.
 
-Flag:
+## x86-32 - Result
 
-![image.png](image%207.png)
+![image.png](image7.png)

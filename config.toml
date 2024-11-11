@@ -1,15 +1,15 @@
-baseURL = "https://example.com"
+baseURL = "https://arzedlab.github.io"
 languageCode = "en-us"
-title = "Arzedlab"
+title = "Arzedlab 🪵"
 theme="archie"
-copyright = "© Athul"
+copyright = "© Ravshan"
 pygmentsstyle = "dracula"
 pygmentscodefences = true
 pygmentscodefencesguesssyntax = true
 [params]
-	mode="light"
+	mode="dark"
 	useCDN=false
-	subtitle = "Minimal and Clean [blog theme for Hugo](https://github.com/athul/archie)"
+	subtitle = "My name is Ravshan, I am deeply involved in cybersecurity and researching, I will share my knowladge in my blog, here, Welcome..."
 	
 
 [[params.social]]
