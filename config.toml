@@ -1,13 +1,13 @@
 baseURL = "https://example.com"
 languageCode = "en-us"
-title = "Archie"
+title = "Arzedlab"
 theme="archie"
 copyright = "© Athul"
-pygmentsstyle = "monokai"
+pygmentsstyle = "dracula"
 pygmentscodefences = true
 pygmentscodefencesguesssyntax = true
 [params]
-	mode="auto"
+	mode="light"
 	useCDN=false
 	subtitle = "Minimal and Clean [blog theme for Hugo](https://github.com/athul/archie)"
 	
@@ -15,7 +15,7 @@ pygmentscodefencesguesssyntax = true
 [[params.social]]
 name = "GitHub"
 icon = "github"
-url = "https://github.com/arzedlab"
+url = "https://github.com/arzedlab/"
 
 [[params.social]]
 name = "Twitter"
