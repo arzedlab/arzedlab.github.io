@@ -7,6 +7,42 @@
     <generator>Hugo</generator>
     <language>en-us</language>
     <copyright>© Ravshan</copyright>
+    <lastBuildDate>Tue, 12 Nov 2024 15:45:36 +0500</lastBuildDate>
     <atom:link href="http://localhost:1313/tags/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Chain</title>
+      <link>http://localhost:1313/tags/chain/</link>
+      <pubDate>Tue, 12 Nov 2024 15:45:36 +0500</pubDate>
+      <guid>http://localhost:1313/tags/chain/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Exploitation</title>
+      <link>http://localhost:1313/tags/exploitation/</link>
+      <pubDate>Tue, 12 Nov 2024 15:45:36 +0500</pubDate>
+      <guid>http://localhost:1313/tags/exploitation/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>ROP</title>
+      <link>http://localhost:1313/tags/rop/</link>
+      <pubDate>Tue, 12 Nov 2024 15:45:36 +0500</pubDate>
+      <guid>http://localhost:1313/tags/rop/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>ROPEmporium</title>
+      <link>http://localhost:1313/tags/ropemporium/</link>
+      <pubDate>Tue, 12 Nov 2024 15:45:36 +0500</pubDate>
+      <guid>http://localhost:1313/tags/ropemporium/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Writeup</title>
+      <link>http://localhost:1313/tags/writeup/</link>
+      <pubDate>Tue, 12 Nov 2024 15:45:36 +0500</pubDate>
+      <guid>http://localhost:1313/tags/writeup/</guid>
+      <description></description>
+    </item>
   </channel>
 </rss>

@@ -3,7 +3,8 @@ title: "ret2win | ROPEmporium [1]"
 date: 2024-11-11T11:41:24+05:00
 tldr: ROPEmporium - 1, ret2win task writeup
 toc: true
-summary: One common introductory ROP challenge is known as **ret2win**. The goal is to call a specific function in the program called `ret2win`, which prints a success message and reveal a flag.txt
+summary: "One common introductory ROP challenge is known as **ret2win**. The goal is to call a specific function in the program called `ret2win`, which prints a success message and reveal a flag.txt"
+tags: [writeup, ROPEmporium, ROP, chain, exploitation]
 ---
 
 

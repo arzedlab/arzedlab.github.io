@@ -7,8 +7,29 @@
     <generator>Hugo</generator>
     <language>en-us</language>
     <copyright>© Ravshan</copyright>
-    <lastBuildDate>Mon, 11 Nov 2024 11:41:24 +0500</lastBuildDate>
+    <lastBuildDate>Tue, 12 Nov 2024 15:45:36 +0500</lastBuildDate>
     <atom:link href="http://localhost:1313/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>write4 | ROPEmporium [4]</title>
+      <link>http://localhost:1313/posts/ropemporium_write4/</link>
+      <pubDate>Tue, 12 Nov 2024 15:45:36 +0500</pubDate>
+      <guid>http://localhost:1313/posts/ropemporium_write4/</guid>
+      <description>Functions themselves are in an external library we should call it from there. Imported files proves the command &lt;code&gt;rabin2 -i &amp;lt;binary&amp;gt;&lt;/code&gt;</description>
+    </item>
+    <item>
+      <title>callme | ROPEmporium [3]</title>
+      <link>http://localhost:1313/posts/ropemporium_callme/</link>
+      <pubDate>Tue, 12 Nov 2024 15:19:36 +0500</pubDate>
+      <guid>http://localhost:1313/posts/ropemporium_callme/</guid>
+      <description>Ok we have three functions, and we should call them with arguments, which are given, there are &lt;code&gt;0xdeadbeef&lt;/code&gt;, &lt;code&gt;0xcafebabe&lt;/code&gt;, &lt;code&gt;0xd00df00d&lt;/code&gt; . Functions itself are in external library we should call them one by one. Buffer overflow offset is the same, and &lt;code&gt;checksec&lt;/code&gt;</description>
+    </item>
+    <item>
+      <title>split | ROPEmporium [2]</title>
+      <link>http://localhost:1313/posts/ropemporium-split/</link>
+      <pubDate>Tue, 12 Nov 2024 14:20:25 +0500</pubDate>
+      <guid>http://localhost:1313/posts/ropemporium-split/</guid>
+      <description>In this challenge, we should run system() function with argument &lt;code&gt;/bin/cat flag.txt&lt;/code&gt;</description>
+    </item>
     <item>
       <title>ret2win | ROPEmporium [1]</title>
       <link>http://localhost:1313/posts/ropemporium-ret2win/</link>
@@ -28,7 +49,7 @@
       <link>http://localhost:1313/about/</link>
       <pubDate>Thu, 28 Feb 2019 00:00:00 +0000</pubDate>
       <guid>http://localhost:1313/about/</guid>
-      <description>&lt;p&gt;Written in Go, Hugo is an open source static site generator available under the &lt;a href=&#34;https://github.com/gohugoio/hugo/blob/master/LICENSE&#34;&gt;Apache Licence 2.0.&lt;/a&gt; Hugo supports TOML, YAML and JSON data file types, Markdown and HTML content files and uses shortcodes to add rich content. Other notable features are taxonomies, multilingual mode, image processing, custom output formats, HTML/CSS/JS minification and support for Sass SCSS workflows.&lt;/p&gt;&#xA;&lt;p&gt;Hugo makes use of a variety of open source projects including:&lt;/p&gt;&#xA;&lt;ul&gt;&#xA;&lt;li&gt;&lt;a href=&#34;https://github.com/yuin/goldmark&#34;&gt;https://github.com/yuin/goldmark&lt;/a&gt;&lt;/li&gt;&#xA;&lt;li&gt;&lt;a href=&#34;https://github.com/alecthomas/chroma&#34;&gt;https://github.com/alecthomas/chroma&lt;/a&gt;&lt;/li&gt;&#xA;&lt;li&gt;&lt;a href=&#34;https://github.com/muesli/smartcrop&#34;&gt;https://github.com/muesli/smartcrop&lt;/a&gt;&lt;/li&gt;&#xA;&lt;li&gt;&lt;a href=&#34;https://github.com/spf13/cobra&#34;&gt;https://github.com/spf13/cobra&lt;/a&gt;&lt;/li&gt;&#xA;&lt;li&gt;&lt;a href=&#34;https://github.com/spf13/viper&#34;&gt;https://github.com/spf13/viper&lt;/a&gt;&lt;/li&gt;&#xA;&lt;/ul&gt;&#xA;&lt;p&gt;Hugo is ideal for blogs, corporate websites, creative portfolios, online magazines, single page applications or even a website with thousands of pages.&lt;/p&gt;</description>
+      <description>&lt;p&gt;Hi, I&amp;rsquo;m Ravshan! I&amp;rsquo;m a cybersecurity researcher with a passion for digging deep into anything that involves assembly 😊. I love uncovering how things work at the most fundamental levels, but it is hard to do. When I&amp;rsquo;m not diving into cybersecurity, you can find me cycling, exploring new routes and staying active. 🚴‍♂️&lt;/p&gt;&#xA;&lt;p&gt;This blog marks the beginning of my journey, and while I&amp;rsquo;ll keep adding more details in the future, for now, this is a good start. Thanks for stopping by, and I hope you find something useful here!&lt;/p&gt;</description>
     </item>
   </channel>
 </rss>

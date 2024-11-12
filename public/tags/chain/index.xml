@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Chain on Arzedlab 🪵</title>
+    <link>http://localhost:1313/tags/chain/</link>
+    <description>Recent content in Chain on Arzedlab 🪵</description>
+    <generator>Hugo</generator>
+    <language>en-us</language>
+    <copyright>© Ravshan</copyright>
+    <lastBuildDate>Tue, 12 Nov 2024 15:45:36 +0500</lastBuildDate>
+    <atom:link href="http://localhost:1313/tags/chain/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>write4 | ROPEmporium [4]</title>
+      <link>http://localhost:1313/posts/ropemporium_write4/</link>
+      <pubDate>Tue, 12 Nov 2024 15:45:36 +0500</pubDate>
+      <guid>http://localhost:1313/posts/ropemporium_write4/</guid>
+      <description>Functions themselves are in an external library we should call it from there. Imported files proves the command &lt;code&gt;rabin2 -i &amp;lt;binary&amp;gt;&lt;/code&gt;</description>
+    </item>
+    <item>
+      <title>callme | ROPEmporium [3]</title>
+      <link>http://localhost:1313/posts/ropemporium_callme/</link>
+      <pubDate>Tue, 12 Nov 2024 15:19:36 +0500</pubDate>
+      <guid>http://localhost:1313/posts/ropemporium_callme/</guid>
+      <description>Ok we have three functions, and we should call them with arguments, which are given, there are &lt;code&gt;0xdeadbeef&lt;/code&gt;, &lt;code&gt;0xcafebabe&lt;/code&gt;, &lt;code&gt;0xd00df00d&lt;/code&gt; . Functions itself are in external library we should call them one by one. Buffer overflow offset is the same, and &lt;code&gt;checksec&lt;/code&gt;</description>
+    </item>
+    <item>
+      <title>split | ROPEmporium [2]</title>
+      <link>http://localhost:1313/posts/ropemporium-split/</link>
+      <pubDate>Tue, 12 Nov 2024 14:20:25 +0500</pubDate>
+      <guid>http://localhost:1313/posts/ropemporium-split/</guid>
+      <description>In this challenge, we should run system() function with argument &lt;code&gt;/bin/cat flag.txt&lt;/code&gt;</description>
+    </item>
+    <item>
+      <title>ret2win | ROPEmporium [1]</title>
+      <link>http://localhost:1313/posts/ropemporium-ret2win/</link>
+      <pubDate>Mon, 11 Nov 2024 11:41:24 +0500</pubDate>
+      <guid>http://localhost:1313/posts/ropemporium-ret2win/</guid>
+      <description>One common introductory ROP challenge is known as &lt;strong&gt;ret2win&lt;/strong&gt;. The goal is to call a specific function in the program called &lt;code&gt;ret2win&lt;/code&gt;, which prints a success message and reveal a flag.txt</description>
+    </item>
+  </channel>
+</rss>

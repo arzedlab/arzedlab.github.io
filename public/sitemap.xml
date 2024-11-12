@@ -3,10 +3,37 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>http://localhost:1313/</loc>
-    <lastmod>2024-11-11T11:41:24+05:00</lastmod>
+    <lastmod>2024-11-12T15:45:36+05:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/tags/chain/</loc>
+    <lastmod>2024-11-12T15:45:36+05:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/tags/exploitation/</loc>
+    <lastmod>2024-11-12T15:45:36+05:00</lastmod>
   </url><url>
     <loc>http://localhost:1313/posts/</loc>
-    <lastmod>2024-11-11T11:41:24+05:00</lastmod>
+    <lastmod>2024-11-12T15:45:36+05:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/tags/rop/</loc>
+    <lastmod>2024-11-12T15:45:36+05:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/tags/ropemporium/</loc>
+    <lastmod>2024-11-12T15:45:36+05:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/tags/</loc>
+    <lastmod>2024-11-12T15:45:36+05:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/posts/ropemporium_write4/</loc>
+    <lastmod>2024-11-12T15:45:36+05:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/tags/writeup/</loc>
+    <lastmod>2024-11-12T15:45:36+05:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/posts/ropemporium_callme/</loc>
+    <lastmod>2024-11-12T15:19:36+05:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/posts/ropemporium-split/</loc>
+    <lastmod>2024-11-12T14:20:25+05:00</lastmod>
   </url><url>
     <loc>http://localhost:1313/posts/ropemporium-ret2win/</loc>
     <lastmod>2024-11-11T11:41:24+05:00</lastmod>
@@ -18,7 +45,5 @@
     <lastmod>2019-02-28T00:00:00+00:00</lastmod>
   </url><url>
     <loc>http://localhost:1313/categories/</loc>
-  </url><url>
-    <loc>http://localhost:1313/tags/</loc>
   </url>
 </urlset>
