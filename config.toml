@@ -25,27 +25,27 @@ icon = "twitter"
 url = "https://twitter.com/arzedlab/"
 
 [[menu.main]]
-name = "Home"
+name = "🏠 Home"
 url = "/"
 weight = 1
 
 [[menu.main]]
-name = "All posts"
+name = "🗂️ All posts"
 url = "/posts"
 weight = 2
 
 [[menu.main]]
-name = "About"
+name = "💡 About Me"
 url = "/about"
 weight = 3
 
 [[menu.main]]
-name = "Publications"
+name = "📑 Publications"
 url = "/papers"
 weight = 4
 
 [[menu.main]]
-name = "Tags"
+name = "🏷️ Tags"
 url = "/tags"
 weight = 5
 
