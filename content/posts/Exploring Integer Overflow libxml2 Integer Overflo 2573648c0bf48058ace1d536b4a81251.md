@@ -1,5 +1,5 @@
 ---
-title:Exploring Integer Overflow: libxml2 Integer Overflow, which leads to OOB
+title: "Exploring Integer Overflow: libxml2 Integer Overflow, which leads to OOB"
 description: We will uncover Integer Overflow vulnerability, and take as an example libxml2 library.
 date: 2025-08-22
 draft: false 

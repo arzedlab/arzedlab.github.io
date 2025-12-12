@@ -1,5 +1,5 @@
 ---
-title:V8 Internals: Tree
+title: "V8 Internals: Tree"
 date: 2023-08-05
 draft: false 
 tags: [v8, tree, internals] 

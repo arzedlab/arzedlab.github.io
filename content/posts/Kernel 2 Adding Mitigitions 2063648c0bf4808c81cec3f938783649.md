@@ -1,5 +1,5 @@
 ---
-title:Linux Kernel Exploitation Part 2: Adding Mitigitions
+title: "Linux Kernel Exploitation Part 2: Adding Mitigitions"
 date: 2025-06-05
 draft: false 
 tags: [linux, kernel, SMEP, rop, exploitation] 

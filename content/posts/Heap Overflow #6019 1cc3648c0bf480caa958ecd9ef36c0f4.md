@@ -1,5 +1,5 @@
 ---
-title: Heap Overflow in assimp
+title: "Heap Overflow in assimp"
 date: 2024-04-5
 draft: false 
 tags: [heap-overflow, assimp, memory] 

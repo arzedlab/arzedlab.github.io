@@ -1,5 +1,5 @@
 ---
-title:Firmware reverse engineering and analysis of router devices
+title: "Firmware reverse engineering and analysis of router devices"
 description: Routers
 date: 2025-11-24
 draft: false 

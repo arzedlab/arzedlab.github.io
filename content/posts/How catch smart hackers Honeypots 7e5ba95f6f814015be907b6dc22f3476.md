@@ -1,5 +1,5 @@
 ---
-title: 🍯 How catch smart hackers? Honeypots
+title: "How catch smart hackers? Honeypots"
 date: 2024-06-20
 draft: false 
 tags: [Honeypot, ssh, golang, Chameleon] 
