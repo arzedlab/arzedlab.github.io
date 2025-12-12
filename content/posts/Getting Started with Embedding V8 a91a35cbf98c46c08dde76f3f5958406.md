@@ -1,6 +1,6 @@
 ---
 title: "Getting Started with Embedding V8"
-description: V8 internals and basics guide.
+description: "A beginner-friendly guide to embedding the V8 JavaScript engine into native applications. It covers initialization, contexts, script execution, and common pitfalls when integrating V8 with C++ projects."
 date: 2023-07-06
 draft: false 
 tags: [embedding, v8, internals] 

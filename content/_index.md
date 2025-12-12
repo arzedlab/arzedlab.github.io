@@ -1,4 +1,1 @@
-+++
-author = "Hugo Authors"
-+++
-
+# Hi Everyone

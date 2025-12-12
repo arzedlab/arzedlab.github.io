@@ -1,6 +1,6 @@
 ---
 title: "Firmware reverse engineering and analysis of router devices"
-description: Routers
+description: "This post explains the firmware extraction and analysis process for consumer-grade routers, focusing on filesystem inspection, ELF analysis, and configuration recovery. It highlights semulation of embedded systems, including libraries, binaries, and services."
 date: 2025-11-24
 draft: false 
 tags: [routers, qemu, simulation, ghidra, reverse, UART, SPI dump] 

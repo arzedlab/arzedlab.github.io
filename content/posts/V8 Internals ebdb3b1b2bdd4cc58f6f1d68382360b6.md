@@ -1,13 +1,11 @@
 ---
 title: "V8 Internals: Tree"
+description: "A conceptual overview of V8’s internal structures ..."
 date: 2023-08-05
 draft: false 
 tags: [v8, tree, internals] 
 toc: true 
 ---
-
-# V8 Internals
-
 
 # V8 source tree
 

@@ -1,5 +1,6 @@
 ---
 title: "Linux Kernel Exploitation Part 2: Adding Mitigitions"
+description: "Building on Part 2, this article discusses the mitigations introduced to block ret2usr attacks, such as SMEP, SMAP, and hardened pointer validation. It examines how these protections change the exploitation landscape and what kernel developers must consider when designing secure code paths."
 date: 2025-06-05
 draft: false 
 tags: [linux, kernel, SMEP, rop, exploitation] 

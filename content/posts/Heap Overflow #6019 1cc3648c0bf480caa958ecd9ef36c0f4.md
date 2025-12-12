@@ -1,5 +1,6 @@
 ---
 title: "Heap Overflow in assimp"
+description: "A detailed breakdown of a heap overflow in the assimp library triggered by malformed model files. The post walks through code paths, root cause analysis, and practical exploitation considerations."
 date: 2024-04-05
 draft: false 
 tags: [heap-overflow, assimp, memory] 

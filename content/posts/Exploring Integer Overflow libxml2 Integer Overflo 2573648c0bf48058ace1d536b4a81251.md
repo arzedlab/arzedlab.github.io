@@ -1,6 +1,6 @@
 ---
 title: "Exploring Integer Overflow: libxml2 Integer Overflow, which leads to OOB"
-description: We will uncover Integer Overflow vulnerability, and take as an example libxml2 library.
+description: "This article explores a critical integer overflow in libxml2 where improper bounds validation leads to out-of-bounds memory access. It walks through the vulnerable function, discusses how arithmetic truncation causes the bug, and demonstrates how attackers can exploit it to leak memory or crash the application."
 date: 2025-08-22
 draft: false 
 tags: [libxml2, Integer Overflow, OOB, heap] 
