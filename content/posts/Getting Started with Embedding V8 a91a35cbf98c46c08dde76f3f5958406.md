@@ -1,7 +1,7 @@
 ---
 title: "Getting Started with Embedding V8"
 description: V8 internals and basics guide.
-date: 2023-07-6
+date: 2023-07-06
 draft: false 
 tags: [embedding, v8, internals] 
 toc: true 

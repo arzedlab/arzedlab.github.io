@@ -1,6 +1,6 @@
 ---
 title: "Heap Overflow in assimp"
-date: 2024-04-5
+date: 2024-04-05
 draft: false 
 tags: [heap-overflow, assimp, memory] 
 toc: true 
