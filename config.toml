@@ -8,11 +8,11 @@ pygmentsstyle = "dracula"
 pygmentscodefences = true
 pygmentscodefencesguesssyntax = true
 [params]
-	mode="dark"
+	mode="light"
 	useCDN=false
 	subtitle = "My name is Ravshan, I am deeply involved in cybersecurity and researching, I will share my knowladge in my blog, here, Welcome..."
-	mathjax = true # enable MathJax support
-	katex = true # enable KaTeX support
+	#mathjax = true # enable MathJax support
+	#katex = true # enable KaTeX support
 
 [[params.social]]
 name = "GitHub"
