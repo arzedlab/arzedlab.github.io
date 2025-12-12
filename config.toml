@@ -8,7 +8,7 @@ pygmentsstyle = "dracula"
 pygmentscodefences = true
 pygmentscodefencesguesssyntax = true
 [params]
-	mode="light"
+	mode="dark"
 	useCDN=false
 	subtitle = "My name is Ravshan, I am deeply involved in cybersecurity and researching, I will share my knowladge in my blog, here, Welcome..."
 	mathjax = true # enable MathJax support
