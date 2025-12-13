@@ -11,7 +11,7 @@ author = "Ravshan R"
 
 # Speaker at Conference
 - **KazHackStan 2025, Almaty** - "[Uncovering Memory Flaws with Taint Analysis](https://drive.google.com/file/d/1bGn8_1gQe8DiXqvdhD9rUPpFzaxTAHXd/view?usp=sharing)"
-- **Positive Hack Talks, Cairo & Cyberkent 3.0, Tashkent**  - "[Unveiling eBPF: Reversing, Exploring the Verifier, and CVEs](https://drive.google.com/file/d/1YyO7knfreQ8Q0JoBqUPhNvQp95W6Z8oh/view?usp=sharing)"
+- **Positive Hack Talks, Cairo & [Cyberkent 3.0, Tashkent](https://youtu.be/ETOAjJpOY7E?si=MInsiA9ZSlNgVvf9)**  - "[Unveiling eBPF: Reversing, Exploring the Verifier, and CVEs](https://drive.google.com/file/d/1YyO7knfreQ8Q0JoBqUPhNvQp95W6Z8oh/view?usp=sharing)"
 
 # Workshops Conducted
 - **Inha University** - *Breaking the Browser: V8 Internals and Exploitation Primitives*

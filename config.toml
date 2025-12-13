@@ -10,7 +10,7 @@ pygmentscodefencesguesssyntax = true
 [params]
 	mode="light"
 	useCDN=false
-	subtitle = "I’m a cybersecurity researcher at ONESEC focused on low-level systems, firmware, and reverse engineering. I publish technical writeups, run hands-on workshops, and mentor students to help grow the next generation of security researchers. Outside work I enjoy cycling and community outreach."
+	subtitle = "I’m a cybersecurity researcher at ONESEC focused on low-level systems, firmware, and compilers. I publish technical writeups, run hands-on workshops, and mentor students to help grow the next generation of security researchers. Outside work I enjoy cycling and community outreach."
 	avatar = "images/profile.jpg"
 	#mathjax = true # enable MathJax support
 	#katex = true # enable KaTeX support
