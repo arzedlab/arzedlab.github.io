@@ -10,14 +10,25 @@ pygmentscodefencesguesssyntax = true
 [params]
 	mode="light"
 	useCDN=false
-	subtitle = "My name is Ravshan, I am deeply involved in cybersecurity and researching, I will share my knowladge in my blog, here, Welcome..."
+	subtitle = "I’m a cybersecurity researcher at ONESEC focused on low-level systems, firmware, and reverse engineering. I publish technical writeups, run hands-on workshops, and mentor students to help grow the next generation of security researchers. Outside work I enjoy cycling and community outreach."
+	avatar = "images/profile.jpg"
 	#mathjax = true # enable MathJax support
 	#katex = true # enable KaTeX support
+
+[params.meta]
+	favicon = true
+
+
 
 [[params.social]]
 name = "GitHub"
 icon = "github"
 url = "https://github.com/arzedlab/"
+
+[[params.social]]
+name = "Linkedin"
+icon = "linkedin"
+url = "https://www.linkedin.com/in/ravshan-rikhsiev/"
 
 [[params.social]]
 name = "Twitter"

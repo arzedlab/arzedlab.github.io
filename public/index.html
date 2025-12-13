@@ -9,11 +9,13 @@
 	<meta property="og:url" content="http://localhost:1313/">
   <meta property="og:site_name" content="Arzedlab 🪵">
   <meta property="og:title" content="Arzedlab 🪵">
+  <meta property="og:description" content="Hi Everyone">
   <meta property="og:locale" content="en_us">
   <meta property="og:type" content="website">
 
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Arzedlab 🪵">
+  <meta name="twitter:description" content="Hi Everyone">
 <script src="http://localhost:1313/js/feather.min.js"></script>
 	
 	
@@ -22,8 +24,6 @@
 
 	
 	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:1313/css/main.7198d56e4fe53ab4610aa7f913b8d3fa7453003ac7791c64a6d6157aecbbced5.css" />
-		<link id="darkModeStyle" rel="stylesheet" type="text/css" href="http://localhost:1313/css/dark.d22e2a2879d933a4b781535fc4c4c716e9f9d35ea4986dd0cbabda82effc4bdd.css"   />
-	
 
 	
 	
@@ -42,13 +42,15 @@
 	</div>
 	<nav>
 		
-		<a href="/">Home</a>
+		<a href="/">🏠 Home</a>
 		
-		<a href="/posts">All posts</a>
+		<a href="/posts">🗂️ All posts</a>
 		
-		<a href="/about">About</a>
+		<a href="/about">💡 About Me</a>
 		
-		<a href="/tags">Tags</a>
+		<a href="/papers">📑 Publications</a>
+		
+		<a href="/tags">🏷️ Tags</a>
 		
 		
 	</nav>
@@ -56,14 +58,168 @@
 
 			
 			<main class="list">
-				<div class="site-description"><p>My name is Ravshan, I am deeply involved in cybersecurity and researching, I will share my knowladge in my blog, here, Welcome&hellip;</p></div>
+				<div class="site-description">
+					<div style="display:flex;align-items:center;gap:1rem;"><img
+							src="/images/profile.jpg"
+							alt="author"
+							style="width:320px;height:320px;object-fit:cover;border-radius:3px;flex-shrink:0;"
+						><div>
+							<h2>Ravshan Rikhsiev — Cybersecurity researcher | Low-level systems, firmware & reverse engineering</h2>
+							<p style="margin:0;">
+								I’m a cybersecurity researcher at ONESEC focused on low-level systems, firmware, and reverse engineering. I publish technical writeups, run hands-on workshops, and mentor students to help grow the next generation of security researchers. Outside work I enjoy cycling and community outreach.
+							</p>
+						</div>
+					</div></div>
+
 				
 				
 				
 				<section class="list-item">
-					<h1 class="title"><a href="/posts/ropemporium_write4/">write4 | ROPEmporium [4]</a></h1>
-					<time>Nov 12, 2024</time>
-					<br><div class="description">
+					<h1 class="title">
+						<a href="/posts/firmware-reverse-engineering-and-analysis-of-route-2b63648c0bf48023a3fec748d42f3844/">Firmware reverse engineering and analysis of router devices</a>
+					</h1>
+					<time>
+						Nov 24, 2025
+						
+					</time>
+					<br>
+					<div class="description">
+	
+	This post explains the firmware extraction and analysis process for consumer-grade routers, focusing on filesystem inspection, ELF analysis, and configuration recovery. It highlights semulation of embedded systems, including libraries, binaries, and services.
+	
+</div>
+					<a class="readmore" href="/posts/firmware-reverse-engineering-and-analysis-of-route-2b63648c0bf48023a3fec748d42f3844/">Read more ⟶</a>
+				</section>
+				
+				<section class="list-item">
+					<h1 class="title">
+						<a href="/posts/exploring-integer-overflow-libxml2-integer-overflo-2573648c0bf48058ace1d536b4a81251/">Exploring Integer Overflow: libxml2 Integer Overflow, which leads to OOB</a>
+					</h1>
+					<time>
+						Aug 22, 2025
+						
+					</time>
+					<br>
+					<div class="description">
+	
+	This article explores a critical integer overflow in libxml2 where improper bounds validation leads to out-of-bounds memory access. It walks through the vulnerable function, discusses how arithmetic truncation causes the bug, and demonstrates how attackers can exploit it to leak memory or crash the application.
+	
+</div>
+					<a class="readmore" href="/posts/exploring-integer-overflow-libxml2-integer-overflo-2573648c0bf48058ace1d536b4a81251/">Read more ⟶</a>
+				</section>
+				
+				<section class="list-item">
+					<h1 class="title">
+						<a href="/posts/kernel-exploitation-ret2usr-part-1-2063648c0bf4802299a9f392ff3c809b/">Linux Kernel Exploitation Part 1: ret2usr</a>
+					</h1>
+					<time>
+						Jun 5, 2025
+						
+					</time>
+					<br>
+					<div class="description">
+	
+	This post introduces kernel exploitation fundamentals through the classic ret2usr technique. It explains how attackers redirect kernel execution into userland memory, why this attack was historically common, and how modern mitigations restrict it.
+	
+</div>
+					<a class="readmore" href="/posts/kernel-exploitation-ret2usr-part-1-2063648c0bf4802299a9f392ff3c809b/">Read more ⟶</a>
+				</section>
+				
+				<section class="list-item">
+					<h1 class="title">
+						<a href="/posts/kernel-2-adding-mitigitions-2063648c0bf4808c81cec3f938783649/">Linux Kernel Exploitation Part 2: Adding Mitigitions</a>
+					</h1>
+					<time>
+						Jun 5, 2025
+						
+					</time>
+					<br>
+					<div class="description">
+	
+	Building on Part 2, this article discusses the mitigations introduced to block ret2usr attacks, such as SMEP, SMAP, and hardened pointer validation. It examines how these protections change the exploitation landscape and what kernel developers must consider when designing secure code paths.
+	
+</div>
+					<a class="readmore" href="/posts/kernel-2-adding-mitigitions-2063648c0bf4808c81cec3f938783649/">Read more ⟶</a>
+				</section>
+				
+				<section class="list-item">
+					<h1 class="title">
+						<a href="/posts/exim-analysis-4-92-1-r-1fc3648c0bf4804d9828e1aa08614f70/">EXIM: CVE-2020-28025: Heap out-of-bounds read in pdkim_finish_bodyhash()</a>
+					</h1>
+					<time>
+						May 26, 2025
+						
+					</time>
+					<br>
+					<div class="description">
+	
+	This article analyzes a heap out-of-bounds read in Exim’s DKIM verification logic caused by missing bounds checks in pdkim_finish_bodyhash(). It shows how a crafted DKIM signature can trigger memory disclosure and discusses why the issue persisted across multiple versions.
+	
+</div>
+					<a class="readmore" href="/posts/exim-analysis-4-92-1-r-1fc3648c0bf4804d9828e1aa08614f70/">Read more ⟶</a>
+				</section>
+				
+				<section class="list-item">
+					<h1 class="title">
+						<a href="/posts/android-cheatsheet-1c03648c0bf480faa82cfb135d983ae5/">Android Cheatsheet</a>
+					</h1>
+					<time>
+						Jan 17, 2025
+						
+					</time>
+					<br>
+					<div class="description">
+	
+	Android cheatsheet for pentesting
+	
+</div>
+					<a class="readmore" href="/posts/android-cheatsheet-1c03648c0bf480faa82cfb135d983ae5/">Read more ⟶</a>
+				</section>
+				
+				<section class="list-item">
+					<h1 class="title">
+						<a href="/posts/linux-heap-exploitation-internals-17a3648c0bf480eda8dcc5f521e1351b/">Linux Heap Exploitation internals</a>
+					</h1>
+					<time>
+						Jan 14, 2025
+						
+					</time>
+					<br>
+					<div class="description">
+	
+	This post dives into the internal structures of the malloc allocator, focusing on chunk metadata, bins. It explains how understanding these internals enables more reliable exploitation and the construction of advanced heap primitives.
+	
+</div>
+					<a class="readmore" href="/posts/linux-heap-exploitation-internals-17a3648c0bf480eda8dcc5f521e1351b/">Read more ⟶</a>
+				</section>
+				
+				<section class="list-item">
+					<h1 class="title">
+						<a href="/posts/unsafe-unlink-1483648c0bf48032a944dc2bc36b5207/">Linux Heap Exploitation: Unsafe Unlink</a>
+					</h1>
+					<time>
+						Jan 14, 2025
+						
+					</time>
+					<br>
+					<div class="description">
+	
+	A focused explanation of the unsafe unlink vulnerability that demonstrates corrupting chunk metadata to achieve arbitrary memory writes. The article includes step-by-step exploit logic and notes on modern mitigations that neutralize the classic technique.
+	
+</div>
+					<a class="readmore" href="/posts/unsafe-unlink-1483648c0bf48032a944dc2bc36b5207/">Read more ⟶</a>
+				</section>
+				
+				<section class="list-item">
+					<h1 class="title">
+						<a href="/posts/ropemporium_write4/">write4 | ROPEmporium [4]</a>
+					</h1>
+					<time>
+						Nov 12, 2024
+						
+					</time>
+					<br>
+					<div class="description">
 	
 	Functions themselves are in an external library we should call it from there. Imported files proves the command <code>rabin2 -i &lt;binary&gt;</code>&hellip;
 	
@@ -72,9 +228,15 @@
 				</section>
 				
 				<section class="list-item">
-					<h1 class="title"><a href="/posts/ropemporium_callme/">callme | ROPEmporium [3]</a></h1>
-					<time>Nov 12, 2024</time>
-					<br><div class="description">
+					<h1 class="title">
+						<a href="/posts/ropemporium_callme/">callme | ROPEmporium [3]</a>
+					</h1>
+					<time>
+						Nov 12, 2024
+						
+					</time>
+					<br>
+					<div class="description">
 	
 	Ok we have three functions, and we should call them with arguments, which are given, there are <code>0xdeadbeef</code>, <code>0xcafebabe</code>, <code>0xd00df00d</code> . Functions itself are in external library we should call them one by one. Buffer overflow offset is the same, and <code>checksec</code>&hellip;
 	
@@ -82,44 +244,36 @@
 					<a class="readmore" href="/posts/ropemporium_callme/">Read more ⟶</a>
 				</section>
 				
-				<section class="list-item">
-					<h1 class="title"><a href="/posts/ropemporium-split/">split | ROPEmporium [2]</a></h1>
-					<time>Nov 12, 2024</time>
-					<br><div class="description">
-	
-	In this challenge, we should run system() function with argument <code>/bin/cat flag.txt</code>&hellip;
-	
-</div>
-					<a class="readmore" href="/posts/ropemporium-split/">Read more ⟶</a>
-				</section>
+
 				
-				<section class="list-item">
-					<h1 class="title"><a href="/posts/ropemporium-ret2win/">ret2win | ROPEmporium [1]</a></h1>
-					<time>Nov 11, 2024</time>
-					<br><div class="description">
+
+<ul class="pagination">
+	<span class="page-item page-prev">
 	
-	One common introductory ROP challenge is known as <strong>ret2win</strong>. The goal is to call a specific function in the program called <code>ret2win</code>, which prints a success message and reveal a flag.txt&hellip;
+	</span>
+	<span class="page-item page-next">
 	
-</div>
-					<a class="readmore" href="/posts/ropemporium-ret2win/">Read more ⟶</a>
-				</section>
-				
-				
+    <a href="/page/2/" class="page-link" aria-label="Next"><span aria-hidden="true">Next →</span></a>
+	
+	</span>
+</ul>
 
 
 			</main>
+
 			<footer>
   <div style="display:flex"><a class="soc" href="https://github.com/arzedlab/" rel="me" title="GitHub"><i data-feather="github"></i></a>
+    <a class="border"></a><a class="soc" href="https://www.linkedin.com/in/ravshan-rikhsiev/" rel="me" title="Linkedin"><i data-feather="linkedin"></i></a>
     <a class="border"></a><a class="soc" href="https://twitter.com/arzedlab/" rel="me" title="Twitter"><i data-feather="twitter"></i></a>
     <a class="border"></a></div>
   <div class="footer-info">
-    2024  © Ravshan | Made with Love ❤️ <a href="https://twitter.com/arzedlab/"> My Twitter 🪽</a>
+    2025  © Ravshan | Made with Love ❤️ <a href="https://twitter.com/arzedlab/"> My Twitter 🪽</a>
   </div>
 </footer>
 <script>
   feather.replace()
 </script>
 		</div>
-		
 	</body>
 </html>
+

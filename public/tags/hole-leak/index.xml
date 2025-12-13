@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Hole-Leak on Arzedlab 🪵</title>
+    <link>http://localhost:1313/tags/hole-leak/</link>
+    <description>Recent content in Hole-Leak on Arzedlab 🪵</description>
+    <generator>Hugo</generator>
+    <language>en-us</language>
+    <copyright>© Ravshan</copyright>
+    <lastBuildDate>Sat, 30 Mar 2024 00:00:00 +0000</lastBuildDate>
+    <atom:link href="http://localhost:1313/tags/hole-leak/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>CVE-2021-38003 The Hole Leak to RCE</title>
+      <link>http://localhost:1313/posts/cve-2021-38003-the-hole-leak-to-rce-ed84a7ccd2664916bb597042d3423439/</link>
+      <pubDate>Sat, 30 Mar 2024 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/posts/cve-2021-38003-the-hole-leak-to-rce-ed84a7ccd2664916bb597042d3423439/</guid>
+      <description>&lt;h1 id=&#34;cve-2021-38003--the-hole-leak-to-rce&#34;&gt;CVE-2021-38003 | The Hole Leak to RCE&lt;/h1&gt;&#xA;&lt;table&gt;&#xA;  &lt;thead&gt;&#xA;      &lt;tr&gt;&#xA;          &lt;th&gt;&lt;strong&gt;Type Of Vulnerability&lt;/strong&gt;&lt;/th&gt;&#xA;          &lt;th&gt;The Hole Leak&lt;/th&gt;&#xA;      &lt;/tr&gt;&#xA;  &lt;/thead&gt;&#xA;  &lt;tbody&gt;&#xA;      &lt;tr&gt;&#xA;          &lt;td&gt;&lt;strong&gt;Security Severity&lt;/strong&gt;&lt;/td&gt;&#xA;          &lt;td&gt;&lt;strong&gt;High&lt;/strong&gt;&lt;/td&gt;&#xA;      &lt;/tr&gt;&#xA;      &lt;tr&gt;&#xA;          &lt;td&gt;&lt;strong&gt;Effected Components&lt;/strong&gt;&lt;/td&gt;&#xA;          &lt;td&gt;&lt;strong&gt;Javascript, Turbofan&lt;/strong&gt;&lt;/td&gt;&#xA;      &lt;/tr&gt;&#xA;      &lt;tr&gt;&#xA;          &lt;td&gt;&lt;strong&gt;Issue Source&lt;/strong&gt;&lt;/td&gt;&#xA;          &lt;td&gt;&lt;a href=&#34;https://issues.chromium.org/issues/40057710&#34;&gt;https://issues.chromium.org/issues/40057710&lt;/a&gt;&lt;/td&gt;&#xA;      &lt;/tr&gt;&#xA;      &lt;tr&gt;&#xA;          &lt;td&gt;&lt;strong&gt;Writeup Source(s)&lt;/strong&gt;&lt;/td&gt;&#xA;          &lt;td&gt;None&lt;/td&gt;&#xA;      &lt;/tr&gt;&#xA;      &lt;tr&gt;&#xA;          &lt;td&gt;&lt;strong&gt;Tested Version&lt;/strong&gt;&lt;/td&gt;&#xA;          &lt;td&gt;Google Chrome 95.0.4638.54 (Official Build) (x86_64)&lt;/td&gt;&#xA;      &lt;/tr&gt;&#xA;      &lt;tr&gt;&#xA;          &lt;td&gt;&lt;strong&gt;Vulnerable commit&lt;/strong&gt;&lt;/td&gt;&#xA;          &lt;td&gt;a4252db3228433fed5c2bdb0fdff9a6b7b638f3b&lt;/td&gt;&#xA;      &lt;/tr&gt;&#xA;  &lt;/tbody&gt;&#xA;&lt;/table&gt;&#xA;&lt;h1 id=&#34;deep-dive-into-vulnerability&#34;&gt;Deep Dive Into Vulnerability&lt;/h1&gt;&#xA;&lt;p&gt;[1] The vulnerability arises as V8 attempts to handle exceptions in &lt;code&gt;JSON.stringify()&lt;/code&gt;. If a exception appears in the built-in function, &lt;code&gt;pending_exception_&lt;/code&gt; is set by the &lt;code&gt;Isolate::set_pending_exception()&lt;/code&gt; method. The calling code then moves to the V8 exception handling mechanism, where the &lt;code&gt;Isolate::pending_exception()&lt;/code&gt; member is fetched from the active isolate and the currently active JavaScript exception handler is invoked using it.&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>

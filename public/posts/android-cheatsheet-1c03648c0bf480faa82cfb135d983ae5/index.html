@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>Android Cheatsheet - Arzedlab 🪵</title><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Android cheatsheet for pentesting" />
+	<meta property="og:image" content=""/>
+	<meta property="og:url" content="http://localhost:1313/posts/android-cheatsheet-1c03648c0bf480faa82cfb135d983ae5/">
+  <meta property="og:site_name" content="Arzedlab 🪵">
+  <meta property="og:title" content="Android Cheatsheet">
+  <meta property="og:description" content="Android cheatsheet for pentesting">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2025-01-17T11:13:32+05:00">
+    <meta property="article:modified_time" content="2025-01-17T11:13:32+05:00">
+    <meta property="article:tag" content="Android">
+    <meta property="article:tag" content="Frida">
+    <meta property="article:tag" content="Ssl-Pinning">
+    <meta property="article:tag" content="Apk">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Android Cheatsheet">
+  <meta name="twitter:description" content="Android cheatsheet for pentesting">
+<script src="http://localhost:1313/js/feather.min.js"></script>
+	
+	
+        <link href="http://localhost:1313/css/fonts.2c2227b81b1970a03e760aa2e6121cd01f87c88586803cbb282aa224720a765f.css" rel="stylesheet">
+	
+
+	
+	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:1313/css/main.7198d56e4fe53ab4610aa7f913b8d3fa7453003ac7791c64a6d6157aecbbced5.css" />
+
+	
+	
+
+	
+	
+
+	
+</head>
+<body>
+        <div class="content"><header>
+	<div class="main">
+		<a href="http://localhost:1313/">Arzedlab 🪵</a>
+	</div>
+	<nav>
+		
+		<a href="/">🏠 Home</a>
+		
+		<a href="/posts">🗂️ All posts</a>
+		
+		<a href="/about">💡 About Me</a>
+		
+		<a href="/papers">📑 Publications</a>
+		
+		<a href="/tags">🏷️ Tags</a>
+		
+		
+	</nav>
+</header>
+
+<main>
+	<article>
+		<div class="title">
+			<h1 class="title">Android Cheatsheet</h1>
+			<div class="meta">Posted on Jan 17, 2025</div>
+		</div>
+		
+
+		
+		<div class="toc">
+		<strong>Table of contents:</strong>
+		<nav id="TableOfContents">
+  <ul>
+    <li>
+      <ul>
+        <li><a href="#android-root-in-genymotion">Android root in Genymotion</a></li>
+        <li><a href="#setting-up-your-android-device"><strong>Setting up your Android device</strong></a></li>
+        <li><a href="#downloading-and-merging-apks">Downloading And Merging APKs</a></li>
+        <li><a href="#sign-apks">Sign Apks https://github.com/patrickfav/uber-apk-signer</a></li>
+        <li><a href="#bypassing-android-ssl-pinning-flutter">Bypassing Android SSL Pinning Flutter</a></li>
+        <li><a href="#bypassing-android-ssl-pinning-javakotlin">Bypassing Android SSL Pinning Java/Kotlin https://github.com/ilya-kozyr/android-ssl-pinning-bypass</a></li>
+        <li><a href="#bypassing-ssl-pinning-with-ghidra">Bypassing ssl pinning with Ghidra</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+		</div>
+
+		<section class="body">
+			<h3 id="android-root-in-genymotion">Android root in Genymotion</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>adb shell setprop persist.sys.root_access <span style="color:#bd93f9">3</span>
+</span></span></code></pre></div><h3 id="setting-up-your-android-device"><strong>Setting up your Android device</strong></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ adb shell getprop ro.product.cpu.abilist <span style="color:#6272a4"># check your device cpu type</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>$ unxz frida-server.xz
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ adb root <span style="color:#6272a4"># might be required</span>
+</span></span><span style="display:flex;"><span>$ adb push frida-server /data/local/tmp/
+</span></span><span style="display:flex;"><span>$ adb shell <span style="color:#f1fa8c">&#34;chmod 755 /data/local/tmp/frida-server&#34;</span>
+</span></span><span style="display:flex;"><span>$ adb shell <span style="color:#f1fa8c">&#34;/data/local/tmp/frida-server &amp;&#34;</span>
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ frida-ps -U
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>frida -U -l multi-bypass.js -f uz.paynet.flagship_mobile
+</span></span></code></pre></div><h3 id="downloading-and-merging-apks">Downloading And Merging APKs</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-java" data-lang="java"><span style="display:flex;"><span>adb shell pm list packages <span style="color:#ff79c6">-</span>3 <span style="color:#ff79c6">|</span> grep telegram
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ adb
+</span></span></code></pre></div><p>One command</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ adb shell pm path org.telegram.messenger | sed <span style="color:#f1fa8c">&#39;s/package://g&#39;</span> | xargs -L <span style="color:#bd93f9">1</span> adb pull
+</span></span></code></pre></div><p>Merge <a href="https://github.com/REAndroid/APKEditor">https://github.com/REAndroid/APKEditor</a></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ java -jar APKEditor.jar m -i apk_files
+</span></span></code></pre></div><h3 id="sign-apks">Sign Apks <a href="https://github.com/patrickfav/uber-apk-signer">https://github.com/patrickfav/uber-apk-signer</a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-fallback" data-lang="fallback"><span style="display:flex;"><span>$ java -jar uber-apk-signer-1.3.0.jar --apk release.RE.apk
+</span></span></code></pre></div><h3 id="bypassing-android-ssl-pinning-flutter">Bypassing Android SSL Pinning Flutter</h3>
+<p>reFlutter: <a href="https://ayoubnajim.medium.com/bypass-ssl-pinning-for-flutter-apps-using-reflutter-framework-f77b858919b7">https://ayoubnajim.medium.com/bypass-ssl-pinning-for-flutter-apps-using-reflutter-framework-f77b858919b7</a></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ pip3 install reflutter
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ reflutter apk_name.apk
+</span></span></code></pre></div><h3 id="bypassing-android-ssl-pinning-javakotlin">Bypassing Android SSL Pinning Java/Kotlin <a href="https://github.com/ilya-kozyr/android-ssl-pinning-bypass">https://github.com/ilya-kozyr/android-ssl-pinning-bypass</a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ python3 apk-rebuild.py input.apk
+</span></span></code></pre></div><h3 id="bypassing-ssl-pinning-with-ghidra">Bypassing ssl pinning with Ghidra</h3>
+<p>First we find offset by searching the strings <code>ssl_client</code> and <code>ssl_server</code></p>
+<p>Then run this script</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>var <span style="color:#8be9fd;font-style:italic">lib_loaded</span> <span style="color:#ff79c6">=</span> 0;
+</span></span><span style="display:flex;"><span>var <span style="color:#8be9fd;font-style:italic">do_dlopen</span> <span style="color:#ff79c6">=</span> null;
+</span></span><span style="display:flex;"><span>var <span style="color:#8be9fd;font-style:italic">call_constructor</span> <span style="color:#ff79c6">=</span> null;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>var <span style="color:#8be9fd;font-style:italic">linker</span> <span style="color:#ff79c6">=</span> Process.findModuleByName<span style="color:#ff79c6">(</span><span style="color:#f1fa8c">&#34;linker64&#34;</span><span style="color:#ff79c6">)</span>;
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">if</span> <span style="color:#ff79c6">(</span><span style="color:#8be9fd;font-style:italic">linker</span> <span style="color:#ff79c6">===</span> null<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>    console.error<span style="color:#ff79c6">(</span><span style="color:#f1fa8c">&#34;Module &#39;linker64&#39; not found!&#34;</span><span style="color:#ff79c6">)</span>;
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">}</span> <span style="color:#ff79c6">else</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>    linker.enumerateSymbols<span style="color:#ff79c6">()</span>.forEach<span style="color:#ff79c6">(</span><span style="color:#ff79c6">function</span><span style="color:#ff79c6">(</span>symbol<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">if</span> <span style="color:#ff79c6">(</span>symbol.name.indexOf<span style="color:#ff79c6">(</span><span style="color:#f1fa8c">&#34;do_dlopen&#34;</span><span style="color:#ff79c6">)</span> &gt;<span style="color:#ff79c6">=</span> 0<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#8be9fd;font-style:italic">do_dlopen</span> <span style="color:#ff79c6">=</span> symbol.address;
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">if</span> <span style="color:#ff79c6">(</span>symbol.name.indexOf<span style="color:#ff79c6">(</span><span style="color:#f1fa8c">&#34;call_constructor&#34;</span><span style="color:#ff79c6">)</span> &gt;<span style="color:#ff79c6">=</span> 0<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#8be9fd;font-style:italic">call_constructor</span> <span style="color:#ff79c6">=</span> symbol.address;
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">})</span>;
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">if</span> <span style="color:#ff79c6">(</span><span style="color:#8be9fd;font-style:italic">do_dlopen</span> <span style="color:#ff79c6">===</span> null<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>    console.error<span style="color:#ff79c6">(</span><span style="color:#f1fa8c">&#34;Symbol &#39;do_dlopen&#39; not found!&#34;</span><span style="color:#ff79c6">)</span>;
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">}</span> <span style="color:#ff79c6">else</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>    Interceptor.attach<span style="color:#ff79c6">(</span>do_dlopen, <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>        onEnter: <span style="color:#ff79c6">function</span><span style="color:#ff79c6">(</span>args<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>            // Try to get the library path from context.x0 or fallback to args<span style="color:#ff79c6">[</span>0<span style="color:#ff79c6">]</span>
+</span></span><span style="display:flex;"><span>            var libPath;
+</span></span><span style="display:flex;"><span>            <span style="color:#ff79c6">if</span> <span style="color:#ff79c6">(</span>this.context <span style="color:#ff79c6">&amp;&amp;</span> this.context.x0 !<span style="color:#ff79c6">==</span> undefined<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>                <span style="color:#8be9fd;font-style:italic">libPath</span> <span style="color:#ff79c6">=</span> this.context.x0;
+</span></span><span style="display:flex;"><span>            <span style="color:#ff79c6">}</span> <span style="color:#ff79c6">else</span> <span style="color:#ff79c6">if</span> <span style="color:#ff79c6">(</span>args<span style="color:#ff79c6">[</span>0<span style="color:#ff79c6">]</span> !<span style="color:#ff79c6">==</span> undefined<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>                <span style="color:#8be9fd;font-style:italic">libPath</span> <span style="color:#ff79c6">=</span> args<span style="color:#ff79c6">[</span>0<span style="color:#ff79c6">]</span>;
+</span></span><span style="display:flex;"><span>            <span style="color:#ff79c6">}</span> <span style="color:#ff79c6">else</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>                console.error<span style="color:#ff79c6">(</span><span style="color:#f1fa8c">&#34;Unable to determine library path pointer.&#34;</span><span style="color:#ff79c6">)</span>;
+</span></span><span style="display:flex;"><span>                <span style="color:#ff79c6">return</span>;
+</span></span><span style="display:flex;"><span>            <span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>            // Ensure libPath is valid
+</span></span><span style="display:flex;"><span>            <span style="color:#ff79c6">if</span> <span style="color:#ff79c6">(</span>libPath.isNull<span style="color:#ff79c6">())</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>                console.error<span style="color:#ff79c6">(</span><span style="color:#f1fa8c">&#34;Library path pointer is null!&#34;</span><span style="color:#ff79c6">)</span>;
+</span></span><span style="display:flex;"><span>                <span style="color:#ff79c6">return</span>;
+</span></span><span style="display:flex;"><span>            <span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>            var <span style="color:#8be9fd;font-style:italic">library_path</span> <span style="color:#ff79c6">=</span> libPath.readCString<span style="color:#ff79c6">()</span>;
+</span></span><span style="display:flex;"><span>            <span style="color:#ff79c6">if</span> <span style="color:#ff79c6">(</span>library_path.indexOf<span style="color:#ff79c6">(</span><span style="color:#f1fa8c">&#34;libflutter.so&#34;</span><span style="color:#ff79c6">)</span> &gt;<span style="color:#ff79c6">=</span> 0<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>                console.log<span style="color:#ff79c6">(</span><span style="color:#f1fa8c">`</span><span style="color:#ff79c6">[</span>+<span style="color:#ff79c6">]</span> Detected loading of <span style="color:#f1fa8c">${</span><span style="color:#8be9fd;font-style:italic">library_path</span><span style="color:#f1fa8c">}</span><span style="color:#f1fa8c">`</span><span style="color:#ff79c6">)</span>;
+</span></span><span style="display:flex;"><span>                <span style="color:#ff79c6">if</span> <span style="color:#ff79c6">(</span>call_constructor !<span style="color:#ff79c6">==</span> null<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>                    Interceptor.attach<span style="color:#ff79c6">(</span>call_constructor, <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>                        onEnter: <span style="color:#ff79c6">function</span><span style="color:#ff79c6">()</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>                            <span style="color:#ff79c6">if</span> <span style="color:#ff79c6">(</span><span style="color:#8be9fd;font-style:italic">lib_loaded</span> <span style="color:#ff79c6">===</span> 0<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>                                <span style="color:#8be9fd;font-style:italic">lib_loaded</span> <span style="color:#ff79c6">=</span> 1;
+</span></span><span style="display:flex;"><span>                                var <span style="color:#8be9fd;font-style:italic">module</span> <span style="color:#ff79c6">=</span> Process.findModuleByName<span style="color:#ff79c6">(</span><span style="color:#f1fa8c">&#34;libflutter.so&#34;</span><span style="color:#ff79c6">)</span>;
+</span></span><span style="display:flex;"><span>                                <span style="color:#ff79c6">if</span> <span style="color:#ff79c6">(</span>module<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>                                    console.log<span style="color:#ff79c6">(</span><span style="color:#f1fa8c">`</span><span style="color:#ff79c6">[</span>+<span style="color:#ff79c6">]</span> libflutter is loaded at <span style="color:#f1fa8c">${</span><span style="color:#8be9fd;font-style:italic">module</span>.base<span style="color:#f1fa8c">}</span><span style="color:#f1fa8c">`</span><span style="color:#ff79c6">)</span>;
+</span></span><span style="display:flex;"><span>                                    // Adjust offset as needed
+</span></span><span style="display:flex;"><span>                                    session_verify_cert_chain<span style="color:#ff79c6">(</span>module.base.add<span style="color:#ff79c6">(</span>0x79af3e<span style="color:#ff79c6">))</span>;
+</span></span><span style="display:flex;"><span>                                <span style="color:#ff79c6">}</span> <span style="color:#ff79c6">else</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>                                    console.error<span style="color:#ff79c6">(</span><span style="color:#f1fa8c">&#34;libflutter.so module not found!&#34;</span><span style="color:#ff79c6">)</span>;
+</span></span><span style="display:flex;"><span>                                <span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>                            <span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>                        <span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>                    <span style="color:#ff79c6">})</span>;
+</span></span><span style="display:flex;"><span>                <span style="color:#ff79c6">}</span> <span style="color:#ff79c6">else</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>                    console.error<span style="color:#ff79c6">(</span><span style="color:#f1fa8c">&#34;Symbol &#39;call_constructor&#39; not found!&#34;</span><span style="color:#ff79c6">)</span>;
+</span></span><span style="display:flex;"><span>                <span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">})</span>;
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">function</span> session_verify_cert_chain<span style="color:#ff79c6">(</span>address<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">if</span> <span style="color:#ff79c6">(</span>!address <span style="color:#ff79c6">||</span> address.isNull<span style="color:#ff79c6">())</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>        console.error<span style="color:#ff79c6">(</span><span style="color:#f1fa8c">&#34;Invalid address for session_verify_cert_chain&#34;</span><span style="color:#ff79c6">)</span>;
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">return</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>    Interceptor.attach<span style="color:#ff79c6">(</span>address, <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>        onLeave: <span style="color:#ff79c6">function</span><span style="color:#ff79c6">(</span>retval<span style="color:#ff79c6">)</span> <span style="color:#ff79c6">{</span>
+</span></span><span style="display:flex;"><span>            retval.replace<span style="color:#ff79c6">(</span>0x1<span style="color:#ff79c6">)</span>;
+</span></span><span style="display:flex;"><span>            console.log<span style="color:#ff79c6">(</span><span style="color:#f1fa8c">`</span><span style="color:#ff79c6">[</span>+<span style="color:#ff79c6">]</span> session_verify_cert_chain retval replaced with: <span style="color:#f1fa8c">${</span><span style="color:#8be9fd;font-style:italic">retval</span><span style="color:#f1fa8c">}</span><span style="color:#f1fa8c">`</span><span style="color:#ff79c6">)</span>;
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">}</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">})</span>;
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">}</span>
+</span></span></code></pre></div>
+		</section>
+
+		<div class="post-tags">
+			
+			
+			<nav class="nav tags">
+				<ul class="tags">
+					
+					<li><a href="/tags/android">android</a></li>
+					
+					<li><a href="/tags/frida">frida</a></li>
+					
+					<li><a href="/tags/ssl-pinning">ssl-pinning</a></li>
+					
+					<li><a href="/tags/apk">apk</a></li>
+					
+				</ul>
+			</nav>
+			
+			
+		</div>
+		</article>
+</main>
+<footer>
+  <div style="display:flex"><a class="soc" href="https://github.com/arzedlab/" rel="me" title="GitHub"><i data-feather="github"></i></a>
+    <a class="border"></a><a class="soc" href="https://www.linkedin.com/in/ravshan-rikhsiev/" rel="me" title="Linkedin"><i data-feather="linkedin"></i></a>
+    <a class="border"></a><a class="soc" href="https://twitter.com/arzedlab/" rel="me" title="Twitter"><i data-feather="twitter"></i></a>
+    <a class="border"></a></div>
+  <div class="footer-info">
+    2025  © Ravshan | Made with Love ❤️ <a href="https://twitter.com/arzedlab/"> My Twitter 🪽</a>
+  </div>
+</footer>
+<script>
+  feather.replace()
+</script></div>
+    </body>
+</html>

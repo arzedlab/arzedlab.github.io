@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Golang on Arzedlab 🪵</title>
+    <link>http://localhost:1313/tags/golang/</link>
+    <description>Recent content in Golang on Arzedlab 🪵</description>
+    <generator>Hugo</generator>
+    <language>en-us</language>
+    <copyright>© Ravshan</copyright>
+    <lastBuildDate>Thu, 20 Jun 2024 00:00:00 +0000</lastBuildDate>
+    <atom:link href="http://localhost:1313/tags/golang/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>How to catch smart hackers? Honeypots</title>
+      <link>http://localhost:1313/posts/how-catch-smart-hackers-honeypots-7e5ba95f6f814015be907b6dc22f3476/</link>
+      <pubDate>Thu, 20 Jun 2024 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/posts/how-catch-smart-hackers-honeypots-7e5ba95f6f814015be907b6dc22f3476/</guid>
+      <description>&lt;h1 id=&#34;honeypot-an-advanced-cybersecurity-strategy-understanding-the-concept-of-a-honeypot&#34;&gt;Honeypot: An Advanced Cybersecurity Strategy, understanding the Concept of a Honeypot&lt;/h1&gt;&#xA;&lt;p&gt;In the vast landscape of cybersecurity, the term &lt;strong&gt;&amp;ldquo;honeypot&amp;rdquo;&lt;/strong&gt; often crops up. But what exactly is a honeypot, and why is it so vital in the world of computer security? Let’s dive into this intriguing concept, breaking it down into easily digestible pieces.&lt;/p&gt;&#xA;&lt;h2 id=&#34;the-lure-of-the-honeypot&#34;&gt;The Lure of the Honeypot&lt;/h2&gt;&#xA;&lt;p&gt;Imagine a jar of honey left out in the open. It’s sweet, tempting, and irresistible to anyone who happens to stumble upon it. In the digital world, a honeypot works similarly. It’s a system or a network deliberately set up to attract cyber attackers, just like the honey attracts bees. However, unlike the real honey which is meant to be consumed, a honeypot is there to watch, learn, and trap malicious actors.&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>

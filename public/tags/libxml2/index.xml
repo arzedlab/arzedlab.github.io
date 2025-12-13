@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Libxml2 on Arzedlab 🪵</title>
+    <link>http://localhost:1313/tags/libxml2/</link>
+    <description>Recent content in Libxml2 on Arzedlab 🪵</description>
+    <generator>Hugo</generator>
+    <language>en-us</language>
+    <copyright>© Ravshan</copyright>
+    <lastBuildDate>Fri, 22 Aug 2025 00:00:00 +0000</lastBuildDate>
+    <atom:link href="http://localhost:1313/tags/libxml2/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Exploring Integer Overflow: libxml2 Integer Overflow, which leads to OOB</title>
+      <link>http://localhost:1313/posts/exploring-integer-overflow-libxml2-integer-overflo-2573648c0bf48058ace1d536b4a81251/</link>
+      <pubDate>Fri, 22 Aug 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/posts/exploring-integer-overflow-libxml2-integer-overflo-2573648c0bf48058ace1d536b4a81251/</guid>
+      <description>&lt;h1 id=&#34;exploring-integer-overflow-libxml2-integer-overflow-oob&#34;&gt;Exploring Integer Overflow: libxml2 Integer Overflow OOB&lt;/h1&gt;&#xA;&lt;p&gt;In everyday life, numbers feel endless. You can always count one higher, or subtract one more. But computers don’t work like that. Inside your machine, numbers are stored in &lt;strong&gt;fixed-sized containers&lt;/strong&gt;  and when you push them past their limits, strange things happen. When a calculation produces a value that’s too large or too small for its container, we get integer overflow or integer underflow.&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>

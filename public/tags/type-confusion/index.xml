@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Type Confusion on Arzedlab 🪵</title>
+    <link>http://localhost:1313/tags/type-confusion/</link>
+    <description>Recent content in Type Confusion on Arzedlab 🪵</description>
+    <generator>Hugo</generator>
+    <language>en-us</language>
+    <copyright>© Ravshan</copyright>
+    <lastBuildDate>Fri, 02 Feb 2024 13:13:13 +0500</lastBuildDate>
+    <atom:link href="http://localhost:1313/tags/type-confusion/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>CVE-2020-6418 Type Confusion V8</title>
+      <link>http://localhost:1313/posts/cve-2020-6418-incorrect-optimization-52d04cb78c1e47608e7874b83db5dcce/</link>
+      <pubDate>Fri, 02 Feb 2024 13:13:13 +0500</pubDate>
+      <guid>http://localhost:1313/posts/cve-2020-6418-incorrect-optimization-52d04cb78c1e47608e7874b83db5dcce/</guid>
+      <description>&lt;h1 id=&#34;cve-2020-6418--incorrect-optimization&#34;&gt;CVE-2020-6418 | Incorrect Optimization&lt;/h1&gt;&#xA;&lt;h2 id=&#34;research-done-by-ravshan-rikhsiev-2023&#34;&gt;&lt;strong&gt;Research Done By Ravshan Rikhsiev (2023)&lt;/strong&gt;&lt;/h2&gt;&#xA;&lt;table&gt;&#xA;  &lt;thead&gt;&#xA;      &lt;tr&gt;&#xA;          &lt;th&gt;&lt;strong&gt;Type Of Vulnerability&lt;/strong&gt;&lt;/th&gt;&#xA;          &lt;th&gt;Type Confusion&lt;/th&gt;&#xA;      &lt;/tr&gt;&#xA;  &lt;/thead&gt;&#xA;  &lt;tbody&gt;&#xA;      &lt;tr&gt;&#xA;          &lt;td&gt;&lt;strong&gt;Security Severity&lt;/strong&gt;&lt;/td&gt;&#xA;          &lt;td&gt;&lt;strong&gt;High&lt;/strong&gt;&lt;/td&gt;&#xA;      &lt;/tr&gt;&#xA;      &lt;tr&gt;&#xA;          &lt;td&gt;&lt;strong&gt;Effected Components&lt;/strong&gt;&lt;/td&gt;&#xA;          &lt;td&gt;&lt;strong&gt;Javascript, Turbofan, Optimizer&lt;/strong&gt;&lt;/td&gt;&#xA;      &lt;/tr&gt;&#xA;      &lt;tr&gt;&#xA;          &lt;td&gt;&lt;strong&gt;Issue Source&lt;/strong&gt;&lt;/td&gt;&#xA;          &lt;td&gt;&lt;a href=&#34;https://issues.chromium.org/issues/40051542&#34;&gt;https://issues.chromium.org/issues/40051542&lt;/a&gt;&lt;/td&gt;&#xA;      &lt;/tr&gt;&#xA;      &lt;tr&gt;&#xA;          &lt;td&gt;&lt;strong&gt;Writeup Source(s)&lt;/strong&gt;&lt;/td&gt;&#xA;          &lt;td&gt;Later&lt;/td&gt;&#xA;      &lt;/tr&gt;&#xA;      &lt;tr&gt;&#xA;          &lt;td&gt;&lt;strong&gt;Tested Version&lt;/strong&gt;&lt;/td&gt;&#xA;          &lt;td&gt;V8 8.2.0&lt;/td&gt;&#xA;      &lt;/tr&gt;&#xA;      &lt;tr&gt;&#xA;          &lt;td&gt;&lt;strong&gt;Vulnerable commit&lt;/strong&gt;&lt;/td&gt;&#xA;          &lt;td&gt;bdaa7d66a37adcc1f1d81c9b0f834327a74ffe07&lt;/td&gt;&#xA;      &lt;/tr&gt;&#xA;  &lt;/tbody&gt;&#xA;&lt;/table&gt;&#xA;&lt;p&gt;&lt;strong&gt;CVE-2020-6418&lt;/strong&gt; is a security vulnerability that was identified in the V8 JavaScript engine, which is used in various web browsers including Google Chrome. This vulnerability was &lt;em&gt;reported by Clement Lecigne of Google&amp;rsquo;s Threat Analysis Group on 2020-02-18&lt;/em&gt; [1] and assigned CVE-2020-6418. It was classified as a type confusion bug in the V8 engine.&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>

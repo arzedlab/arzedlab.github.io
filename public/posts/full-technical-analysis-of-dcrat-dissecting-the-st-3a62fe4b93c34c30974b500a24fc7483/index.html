@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>Full-Technical Analysis of DcRAT: Dissecting the Stealth, Persistence, and Power of DarkCrystal RAT - Arzedlab 🪵</title><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="A deep technical exploration of DcRAT’s architecture, revealing how it disables system logging, harvests credentials, profiles compromised hosts, and communicates with its C2 infrastructure. This report illustrates the layered tactics that make DcRAT a persistent and adaptable threat in modern cyberattacks." />
+	<meta property="og:image" content=""/>
+	<meta property="og:url" content="http://localhost:1313/posts/full-technical-analysis-of-dcrat-dissecting-the-st-3a62fe4b93c34c30974b500a24fc7483/">
+  <meta property="og:site_name" content="Arzedlab 🪵">
+  <meta property="og:title" content="Full-Technical Analysis of DcRAT: Dissecting the Stealth, Persistence, and Power of DarkCrystal RAT">
+  <meta property="og:description" content="A deep technical exploration of DcRAT’s architecture, revealing how it disables system logging, harvests credentials, profiles compromised hosts, and communicates with its C2 infrastructure. This report illustrates the layered tactics that make DcRAT a persistent and adaptable threat in modern cyberattacks.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2024-08-31T00:00:00+00:00">
+    <meta property="article:modified_time" content="2024-08-31T00:00:00+00:00">
+    <meta property="article:tag" content="Routers">
+    <meta property="article:tag" content="Qemu">
+    <meta property="article:tag" content="Simulation">
+    <meta property="article:tag" content="Ghidra">
+    <meta property="article:tag" content="Reverse">
+    <meta property="article:tag" content="UART">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Full-Technical Analysis of DcRAT: Dissecting the Stealth, Persistence, and Power of DarkCrystal RAT">
+  <meta name="twitter:description" content="A deep technical exploration of DcRAT’s architecture, revealing how it disables system logging, harvests credentials, profiles compromised hosts, and communicates with its C2 infrastructure. This report illustrates the layered tactics that make DcRAT a persistent and adaptable threat in modern cyberattacks.">
+<script src="http://localhost:1313/js/feather.min.js"></script>
+	
+	
+        <link href="http://localhost:1313/css/fonts.2c2227b81b1970a03e760aa2e6121cd01f87c88586803cbb282aa224720a765f.css" rel="stylesheet">
+	
+
+	
+	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:1313/css/main.7198d56e4fe53ab4610aa7f913b8d3fa7453003ac7791c64a6d6157aecbbced5.css" />
+
+	
+	
+
+	
+	
+
+	
+</head>
+<body>
+        <div class="content"><header>
+	<div class="main">
+		<a href="http://localhost:1313/">Arzedlab 🪵</a>
+	</div>
+	<nav>
+		
+		<a href="/">🏠 Home</a>
+		
+		<a href="/posts">🗂️ All posts</a>
+		
+		<a href="/about">💡 About Me</a>
+		
+		<a href="/papers">📑 Publications</a>
+		
+		<a href="/tags">🏷️ Tags</a>
+		
+		
+	</nav>
+</header>
+
+<main>
+	<article>
+		<div class="title">
+			<h1 class="title">Full-Technical Analysis of DcRAT: Dissecting the Stealth, Persistence, and Power of DarkCrystal RAT</h1>
+			<div class="meta">Posted on Aug 31, 2024</div>
+		</div>
+		
+
+		
+		<div class="toc">
+		<strong>Table of contents:</strong>
+		<nav id="TableOfContents">
+  <ul>
+    <li>
+      <ul>
+        <li><a href="#dns-requests"><strong>DNS requests</strong></a></li>
+      </ul>
+    </li>
+    <li><a href="#ip-addresses">IP addresses</a>
+      <ul>
+        <li><a href="#httphttps-requests"><strong>HTTP/HTTPS requests</strong></a></li>
+      </ul>
+    </li>
+  </ul>
+
+  <ul>
+    <li><a href="#key-features">Key features</a>
+      <ul>
+        <li><a href="#telegram-channel">Telegram channel</a></li>
+        <li><a href="#bot">Bot</a></li>
+        <li><a href="#prices">Prices</a></li>
+      </ul>
+    </li>
+  </ul>
+
+  <ul>
+    <li><a href="#enumerate-cameras"><strong>Enumerate Cameras</strong></a>
+      <ul>
+        <li><a href="#display-information-retrieval">Display Information Retrieval</a></li>
+        <li><a href="#audio-device-information-collection">Audio Device Information Collection</a></li>
+        <li><a href="#telegram-data-directory-detection">Telegram Data Directory Detection</a></li>
+        <li><a href="#discord-installation-path-detection">Discord Installation Path Detection</a></li>
+        <li><a href="#steam-auto-login-user-retrieval">Steam Auto-Login User Retrieval</a></li>
+        <li><a href="#steam-account-retrieval-from-configuration">Steam Account Retrieval from Configuration</a></li>
+        <li><a href="#steam-configuration-and-data-retrieval">Steam Configuration and Data Retrieval</a></li>
+        <li><a href="#geo-location-retrieval">Geo-Location Retrieval</a></li>
+        <li><a href="#custom-self-extracting-executable-malware-generator"><strong>Custom Self-Extracting Executable Malware Generator</strong></a></li>
+        <li><a href="#automated-batch-file-execution-for-malicious-payloads"><strong>Automated Batch File Execution for Malicious Payloads</strong></a></li>
+        <li><a href="#network-operations-and-data-handling-in-malware-code"><strong>Network Operations and Data Handling in Malware Code</strong></a></li>
+        <li><a href="#packed-to-unpacked-malware">Packed To Unpacked Malware</a></li>
+        <li><a href="#incident-report-malicious-activity-involving-suspicious-executables-registry-modifications-and-network-communications">Incident Report: Malicious Activity Involving Suspicious Executables, Registry Modifications, and Network Communications</a></li>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#execution-chain-and-process-behavior">Execution Chain and Process Behavior</a></li>
+        <li><a href="#registry-modifications-and-persistence-mechanisms">Registry Modifications and Persistence Mechanisms</a></li>
+        <li><a href="#network-communications-and-potential-cnc-activity">Network Communications and Potential CnC Activity</a></li>
+        <li><a href="#abusing-svchostexe-for-malicious-purposes">Abusing svchost.exe for Malicious Purposes</a></li>
+        <li><a href="#conclusion">Conclusion</a></li>
+        <li><a href="#c2-server">C2 Server</a></li>
+        <li><a href="#mitre--attck">MITRE  ATT&amp;CK</a></li>
+        <li><a href="#tactics-and-techniques">Tactics and Techniques:</a></li>
+        <li><a href="#analysis-summary">Analysis Summary:</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+		</div>
+
+		<section class="body">
+			<h1 id="ioc">IOC</h1>
+<p>Malicious file: “Огохланитриш_хати06.08.2024.pdf.exe_”</p>
+<p>Hashes</p>
+<table>
+  <thead>
+      <tr>
+          <th><strong>Тип</strong></th>
+          <th><strong>Значения</strong></th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>MD5</td>
+          <td>2cdb1d87940645acadcec093307b91dd</td>
+      </tr>
+      <tr>
+          <td>SHA1</td>
+          <td>fb16cec8b295ad76ff7ecbc1aa769e6553c7e5ba</td>
+      </tr>
+      <tr>
+          <td>SHA256</td>
+          <td>e6e93d2ec20e1aec2db995ae2a98eb35231d0b80564d257e4d9b87b0cbfc95af</td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Загруженные исполняемые файлы</strong></p>
+<table>
+  <thead>
+      <tr>
+          <th><strong>Путь</strong></th>
+          <th><strong>SHA256 Hash</strong></th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>C:\Users\username\AppData\Roaming\2ZbCeAH0wY.exe</td>
+          <td>caf29650446db3842e1c1e8e5e1bafadaf90fc82c5c37b9e2c75a089b7476131</td>
+      </tr>
+      <tr>
+          <td>C:\Users\username\AppData\Roaming\NjcXx3wcvK.exe</td>
+          <td>7526e43bb967b29c8a3afbb4ae23a86184f5eadf4279dace89c18946b2e63a9e</td>
+      </tr>
+      <tr>
+          <td>C:\Users\username\Desktop\RgkotKHZ.log</td>
+          <td>aab95596475ca74cede5ba50f642d92fa029f6f74f6faeae82a9a07285a5fb97</td>
+      </tr>
+      <tr>
+          <td>C:\Users\usernam\Desktop\MliXleSf.log</td>
+          <td>1f02230a8536adb1d6f8dadfd7ca8ca66b5528ec98b15693e3e2f118a29d49d8</td>
+      </tr>
+  </tbody>
+</table>
+<h3 id="dns-requests"><strong>DNS requests</strong></h3>
+<p><strong>Domain</strong></p>
+<hr>
+<p>476072cm[.]nyashsens[.]top</p>
+<hr>
+<h2 id="ip-addresses">IP addresses</h2>
+<hr>
+<p>20.166.126.56</p>
+<hr>
+<p>95.101.149.131</p>
+<hr>
+<p>80.211.144.156</p>
+<hr>
+<h3 id="httphttps-requests"><strong>HTTP/HTTPS requests</strong></h3>
+<p><strong>URL</strong></p>
+<hr>
+<p>hxxp[://]476072cm[.]nyashsens[.]top/ExternalRequestUpdateMultiuniversallocal[.]php</p>
+<hr>
+<p>hxxp[://]ocsp[.]digicert[.]com/MFEwTzBNMEswSTAJBgUrDgMCGgUABBSAUQYBMq2awn1Rh6Doh%2FsBYgFV7gQUA95QNVbRTLtm8KPiGxvDl7I90VUCEAJ0LqoXyo4hxxe7H%2Fz9DKA%3D</p>
+<hr>
+<p>hxxp[://]www[.]microsoft[.]com/pkiops/crl/Microsoft%20ECC%20Product%20Root%20Certificate%20Authority%202018[.]crl</p>
+<hr>
+<p>hxxp[://]www[.]microsoft[.]com/pkiops/crl/Microsoft%20ECC%20Update%20Secure%20Server%20CA%202[.]1[.]crl</p>
+<hr>
+<h1 id="introduction">Introduction</h1>
+<p>DCrat (Dark Crystal RAT) is an advanced remote access trojan that first appeared in 2018 and has since been used by threat actors in a variety of cyberattacks. DCrat is notable for its modular architecture, which lets attackers enable or disable features according to the goals of a campaign.</p>
+<h2 id="key-features">Key features</h2>
+<p><strong>Modular design.</strong> Dark Crystal is built around plug-in modules, allowing operators to mix and match functionality, for example, modules for credential theft, user activity monitoring, keylogging, or remote command execution.</p>
+<p><strong>Broad capability set.</strong> Typical modules and capabilities include:</p>
+<ul>
+<li>Credential theft from browsers, mail clients, FTP clients and other applications.</li>
+<li>Account/session hijacking for services such as Telegram and Steam, giving attackers access to private chats and account data.</li>
+<li>Keyloggers that capture keystrokes to harvest sensitive information like usernames and passwords.</li>
+</ul>
+<p><strong>Propagation methods.</strong> DCrat spreads through several common vectors:</p>
+<ul>
+<li>Phishing campaigns: attackers distribute malicious attachments disguised as legitimate documents or apps; once opened, the payload infects the system.</li>
+<li>Exploit-based delivery: in some cases, DCrat is deployed via software vulnerabilities, enabling compromise without user interaction.</li>
+</ul>
+<p><strong>Command &amp; control.</strong> The malware provides operators with a remote control interface — a command center used to issue commands, retrieve data from infected hosts, and manage modules.</p>
+<p><strong>Evasion of defenses.</strong> Dark Crystal includes anti-detection techniques such as encrypted traffic and process hiding to evade antivirus and intrusion detection systems.</p>
+<p><strong>Affordability and availability.</strong> DCrat is widely available on hacker forums at relatively low cost, which makes it attractive to less experienced cybercriminals who want a turnkey RAT with many features.</p>
+<p>They sell them on various forums and Telegram channels.</p>
+<p><img src="image.png" alt="image.png"></p>
+<h3 id="telegram-channel">Telegram channel</h3>
+<p><img src="image%201.png" alt="image.png"></p>
+<h3 id="bot">Bot</h3>
+<p><img src="image%202.png" alt="image.png"></p>
+<h3 id="prices">Prices</h3>
+<p>For 2 months - 600 rubles (or $6.63)
+For a year - 2,500 rubles (or $27.61)
+Lifetime license - 4,500 rubles (or $49.71)
+[Prices as of August 31, 2024]
+The Telegram channel has an average of 4,000 users.</p>
+<h1 id="what-a-malware-can-cause-technical-analysis">What a malware can cause, technical analysis</h1>
+<h2 id="enumerate-cameras"><strong>Enumerate Cameras</strong></h2>
+<p><img src="image%203.png" alt="image.png"></p>
+<p>This code snippet is part of a malware that collects information about imaging devices (such as cameras) connected to a Windows system. It uses Windows Management Instrumentation (WMI) to query for devices with <code>PNPClass</code> set to either &ldquo;Image&rdquo; or &ldquo;Camera.&rdquo; The malware gathers the names (captions) of these devices and returns them as a single string. This behavior is typically used for reconnaissance purposes, allowing the malware to identify the hardware environment of the infected system.</p>
+<h3 id="display-information-retrieval">Display Information Retrieval</h3>
+<p><img src="image%204.png" alt="image.png"></p>
+<p>This code snippet in the malware collects and formats information about all connected display screens. It retrieves details such as the device name, resolution adjusted for DPI scaling, and DPI settings for each screen. This data is gathered to potentially aid in screen-related malicious activities, such as capturing screenshots or adjusting the malware&rsquo;s behavior based on the screen configuration.</p>
+<h3 id="audio-device-information-collection">Audio Device Information Collection</h3>
+<p><img src="image%205.png" alt="image.png"></p>
+<p>This code snippet is part of malware that collects information about audio input devices connected to the system. It queries the number of audio devices and retrieves their capabilities, specifically focusing on the device names. This information is gathered to potentially assist in monitoring or recording audio, or to tailor the malware&rsquo;s actions based on the available audio hardware.</p>
+<h3 id="telegram-data-directory-detection">Telegram Data Directory Detection</h3>
+<p><img src="image%206.png" alt="image.png"></p>
+<p>The malware determines the installation path of Telegram using two approaches. First, it extracts the installation path from the Windows Registry by applying a regular expression to find &ldquo;Telegram.exe&rdquo; and obtain the directory path. Second, it identifies processes related to Telegram (such as &ldquo;Telegram&rdquo; and &ldquo;Kotatogram&rdquo;), retrieves their executable paths via the <code>w_QueryFullProcessImageName</code> API, and checks if these paths contain a &ldquo;tdata&rdquo; folder, which is used by Telegram to store user data. This enables the malware to locate where Telegram is installed and potentially access its data.</p>
+<h3 id="discord-installation-path-detection">Discord Installation Path Detection</h3>
+<p><img src="image%207.png" alt="image.png"></p>
+<p>This malware snippet attempts to locate the installation path of Discord or its variants. It checks for specific folder names related to Discord in the user&rsquo;s Application Data directory. The code constructs potential paths for various Discord-related applications and verifies their existence. If it finds a matching directory, it returns that path; otherwise, it returns &ldquo;Unknown.&rdquo; This method helps the malware identify where Discord is installed, which could be used for accessing or manipulating related data.</p>
+<h3 id="steam-auto-login-user-retrieval">Steam Auto-Login User Retrieval</h3>
+<p><img src="image%208.png" alt="image.png"></p>
+<p>This malware code snippet retrieves the auto-login username for Steam by querying the Windows Registry. It searches the registry keys for both the current user and local machine under the path <code>SOFTWARE\Valve\Steam</code> to find the <code>AutoLoginUser</code> value. If it successfully retrieves this value, it returns the username associated with Steam&rsquo;s auto-login feature; otherwise, it returns &ldquo;Unknown.&rdquo; This functionality allows the malware to obtain sensitive information related to Steam user accounts.</p>
+<h3 id="steam-account-retrieval-from-configuration">Steam Account Retrieval from Configuration</h3>
+<p><img src="image%209.png" alt="image.png"></p>
+<p><img src="image%2010.png" alt="image.png"></p>
+<p><img src="image%2011.png" alt="image.png"></p>
+<p><img src="image%2012.png" alt="image.png"></p>
+<h3 id="steam-configuration-and-data-retrieval">Steam Configuration and Data Retrieval</h3>
+<p>This code snippet is focused on retrieving various configuration and data details related to Steam:</p>
+<ol>
+<li><strong>Account Information (<code>smethod_2</code>)</strong>: This method retrieves the Steam account information.</li>
+<li><strong>It uses the auto-login username obtained from</strong> <code>Y45.RR4()</code> and searches the <code>loginusers.vdf</code> configuration file for an account that matches this username. If a match is found, it returns account details; otherwise, it returns &ldquo;Unknown.&rdquo;</li>
+<li><strong>Language Preference (<code>rm1</code>)</strong>: This method retrieves the language preference set in Steam. It queries the registry under both <code>Registry.CurrentUser</code> and <code>Registry.LocalMachine</code> for the <code>Language</code> value in <code>SOFTWARE\\Valve\\Steam</code>. It returns the language setting if found or &ldquo;Unknown&rdquo; if there’s an error or no value is found.</li>
+<li><strong>Steam Installation Path (<code>u19</code>)</strong>: This method obtains the Steam installation path from the registry. It looks for the <code>SteamPath</code> value in <code>SOFTWARE\\Valve\\Steam</code> under both registry hives. It returns the installation path or &ldquo;Unknown&rdquo; if it can&rsquo;t be found.</li>
+<li><strong>Installed Games (<code>U9v</code>)</strong>: This method lists installed Steam games. It uses the path obtained from <code>Y45.u19()</code> to check if the directory <code>steamapps/common</code> exists. If it does, it retrieves the names of directories within this path, which correspond to installed games, and returns them as a newline-separated string. If the path or directories are not found, it returns an empty string.</li>
+</ol>
+<p>These methods collectively allow the malware to gather comprehensive information about Steam configurations, including user account details, language settings, installation paths, and installed games.</p>
+<h3 id="geo-location-retrieval">Geo-Location Retrieval</h3>
+<p><img src="image%2013.png" alt="image.png"></p>
+<p><img src="image%2014.png" alt="image.png"></p>
+<p><img src="image%2015.png" alt="image.png"></p>
+<p>This code snippet is designed to obtain geo-location data using different methods, depending on available interfaces.</p>
+<ol>
+<li><strong><code>D7j</code> Method</strong>: This method returns geo-location information as a <code>v75</code> object. It first checks if a dictionary containing geo-location data is provided. If so, it constructs a <code>v75</code> object from the dictionary values. If no dictionary is provided, it falls back to using the <code>om2</code> method to retrieve location data from various sources.</li>
+<li><strong><code>om2</code> Method</strong>: This method iterates through an array of <code>Interface1</code> implementations to obtain geo-location data. It tries to use each interface until it finds one that can successfully retrieve data, returning a <code>v75</code> object with the information. If none of the interfaces provide data, it returns a default <code>v75</code> object with &ldquo;Unknown&rdquo; values.</li>
+<li><strong><code>Class23</code> Implementation</strong>: This class implements the <code>Interface1</code> interface to retrieve geo-location data. It uses a URL encoded in a Base64 string to make a request and parse the response into a dictionary. The dictionary is used to create a <code>v75</code> object with the retrieved IP, country, region, city, and coordinates. If data retrieval fails, it returns <code>false</code>.</li>
+<li><strong><code>iES</code> Implementation</strong>: This class also implements the <code>Interface1</code> interface but uses a different URL, also encoded in Base64. It parses the response to extract the IP, country code, country, timezone, and coordinates. The data is then used to create a <code>v75</code> object. Similar to <code>Class23</code>, if data retrieval fails, it returns <code>false</code>.</li>
+</ol>
+<p>These methods are used to gather geo-location data through different services. The choice of service is based on the success of retrieving data from available interfaces. If the primary method fails, the code defaults to using predefined values.</p>
+<h3 id="custom-self-extracting-executable-malware-generator"><strong>Custom Self-Extracting Executable Malware Generator</strong></h3>
+<p>Also malware can program that generates a self-extracting executable (SFX). Here&rsquo;s a summary of its key functionalities and what it does:</p>
+<ol>
+<li><strong>Creating a Self-Extracting Executable</strong>:
+<ul>
+<li>The malware uses the <code>GClass0</code> class to create an SFX file, which is essentially an executable file that extracts and executes additional content when run.</li>
+</ul>
+</li>
+<li><strong>File Management and Checks</strong>:
+<ul>
+<li>It checks if the specified file path for the SFX is a directory (which is invalid) and whether the file already exists. It manages file paths and ensures the SFX file does not overwrite existing files unless specified.</li>
+</ul>
+</li>
+<li><strong>Resource Handling</strong>:
+<ul>
+<li>The malware includes embedded resources (e.g., icons) and files in the SFX. It uses <code>Ds8</code> to copy these resources from the assembly&rsquo;s embedded resources to the file system.</li>
+</ul>
+</li>
+<li><strong>Code Compilation</strong>:
+<ul>
+<li>It compiles code dynamically to create the extraction logic for the SFX. This includes generating a C# source code file that defines how the SFX will behave (e.g., extracting files to a specified location).</li>
+</ul>
+</li>
+<li><strong>Error Handling and Cleanup</strong>:
+<ul>
+<li>The code includes extensive error handling and cleanup procedures. It attempts to delete temporary files and directories created during the SFX creation process if an error occurs or after the process is complete.</li>
+</ul>
+</li>
+<li><strong>Dynamic Behavior</strong>:
+<ul>
+<li>The malware can customize the SFX behavior based on various parameters, such as setting window titles, defining extraction commands, and specifying what happens after extraction.</li>
+</ul>
+</li>
+</ol>
+<p>In essence, this malware creates a custom self-extracting executable that can include additional malicious code or files. The SFX file will execute this code or perform specific actions when run, potentially leading to further infection or exploitation.</p>
+<h3 id="automated-batch-file-execution-for-malicious-payloads"><strong>Automated Batch File Execution for Malicious Payloads</strong></h3>
+<p><img src="image%2016.png" alt="image.png"></p>
+<p><img src="image%2017.png" alt="image.png"></p>
+<p>The <code>Class19</code> class in this malware is designed to execute a series of potentially malicious tasks using a batch file. It constructs a batch file with specific commands intended for execution on the target system. The <code>S35</code> method allows adding commands to delete specified files quietly and forcefully. Similarly, the <code>R12</code> method is used to add commands that launch specified executable files. The <code>method_0</code> method assembles the content of the batch file, starting with base commands like <code>@echo off</code> and <code>chcp 65001</code>, and incorporates additional commands from a predefined list along with those added through <code>S35</code> and <code>R12</code>. Finally, the <code>H16</code> method writes the batch file to disk and executes it, using <code>ProcessStartInfo</code> to handle the execution, potentially with elevated privileges depending on the system setup. Overall, this malware uses the batch file to perform operations such as deleting files or launching programs, which could be part of a broader malicious strategy.</p>
+<h3 id="network-operations-and-data-handling-in-malware-code"><strong>Network Operations and Data Handling in Malware Code</strong></h3>
+<p><img src="image%2018.png" alt="image.png"></p>
+<p>The code snippet demonstrates how the malware interacts with web resources and processes data. It includes functions to download data from a URL, extract the host from a URL, and generate HTTP multipart form data for file uploads. The code also manages different user-agent strings to mimic various web browsers and handles data in memory before sending it over the network.</p>
+<h3 id="packed-to-unpacked-malware">Packed To Unpacked Malware</h3>
+<p><img src="image%2019.png" alt="image.png"></p>
+<h3 id="incident-report-malicious-activity-involving-suspicious-executables-registry-modifications-and-network-communications">Incident Report: Malicious Activity Involving Suspicious Executables, Registry Modifications, and Network Communications</h3>
+<h3 id="overview">Overview</h3>
+<p>An analysis of the task titled “Огохланитриш_хати06.08.2024.pdf.exe” reveals concerning behavior that suggests the presence of malware within the system. The execution chain involves multiple processes, starting from &ldquo;svchost.exe&rdquo; and leading to the execution of several executables located in the user&rsquo;s Temp and Roaming folders. During the task, registry changes were made, and repeated HTTP requests were observed. These actions strongly indicate malicious intent, with the potential for unauthorized access, system compromise, and data exfiltration.</p>
+<h3 id="execution-chain-and-process-behavior">Execution Chain and Process Behavior</h3>
+<p>The task begins with the execution of &ldquo;svchost.exe,&rdquo; a legitimate Windows process, but under suspicious circumstances. The parent process of &ldquo;svchost.exe&rdquo; is &ldquo;services.exe,&rdquo; which is typical for legitimate system activities. However, further investigation reveals that &ldquo;svchost.exe&rdquo; launched additional executables located in the Temp and Roaming folders of the user profile. These executables, such as &ldquo;9XvUQZHX9b.exe&rdquo; and &ldquo;h7OPMaA1Ec.exe,&rdquo; are not part of standard software operations and suggest that they were dropped onto the system by a malicious actor.</p>
+<p>In legitimate scenarios, executable files are often dropped by installers or software updates. However, in this case, the executables in question were located in temporary directories and exhibited behavior consistent with malware, such as modifying registry settings and attempting to connect to remote servers.</p>
+<h3 id="registry-modifications-and-persistence-mechanisms">Registry Modifications and Persistence Mechanisms</h3>
+<p>The executables dropped by the task made several registry changes, particularly in the areas related to Internet settings and file tracing. These modifications could be an attempt to disable security features or hide traces of malicious activity on the system. Registry keys are a common target for malware as they can be used to ensure persistence, allowing the malware to execute upon system startup or other key events.</p>
+<p>One particular registry-related event involved checking for supported languages on the system. This behavior is often associated with profiling the system to determine if it is a viable target for further exploitation. The results of this reconnaissance could then be sent back to a command and control (CnC) server for further instructions.</p>
+<h3 id="network-communications-and-potential-cnc-activity">Network Communications and Potential CnC Activity</h3>
+<p>During the task, multiple HTTP requests were observed, all directed to the same URL. This repeated network activity strongly suggests that the system was communicating with an external server. Such behavior is characteristic of remote administration tools (RATs), which establish a connection with a CnC server to receive commands from the attacker.</p>
+<p>The presence of the DarkCrystal Remote Administration Tool (DcRAT) in network traffic and dropped files indicates that the system may have been compromised by malware designed to provide unauthorized remote access. DcRAT is known for its capabilities in data exfiltration, system control, and disabling security measures.</p>
+<h3 id="abusing-svchostexe-for-malicious-purposes">Abusing svchost.exe for Malicious Purposes</h3>
+<p>The use of &ldquo;svchost.exe&rdquo; in this scenario further raises suspicion. While &ldquo;svchost.exe&rdquo; is a legitimate process used to host services on Windows, it is also a known target for abuse by malware. By running malicious code within &ldquo;svchost.exe,&rdquo; attackers can blend their activities with legitimate system processes, making detection more difficult. In this case, &ldquo;svchost.exe&rdquo; was executed with specific parameters, including &ldquo;-k NetworkService -p -s Dnscache,&rdquo; which is commonly associated with the DNS Client service. However, this could have been an attempt to disguise malicious DNS-related activities under the guise of a legitimate service.</p>
+<h3 id="conclusion">Conclusion</h3>
+<p>The task titled “Огохланитриш_хати06.08.2024.pdf.exe” exhibits clear signs of malicious activity. The execution of suspicious executables from the Temp and Roaming folders, along with registry modifications and repeated HTTP requests, indicate that the system was likely compromised by malware. The presence of DcRAT and the use of &ldquo;svchost.exe&rdquo; to host potentially malicious services further support this conclusion. This activity poses a significant risk to the affected system, including the possibility of unauthorized remote access, data theft, and continued persistence on the network. Immediate remediation is recommended to contain the threat and prevent further damage.</p>
+<h3 id="c2-server">C2 Server</h3>
+<p>C2 communication typically involves sending and receiving encrypted or obfuscated messages over common protocols such as HTTP, HTTPS, or DNS. In this case, the suspicious processes, including executables like &ldquo;9XvUQZHX9b.exe&rdquo; and &ldquo;h7OPMaA1Ec.exe,&rdquo; made repeated HTTP requests to a single URL. This behavior is consistent with malware that connects to a remote server controlled by an attacker to perform malicious tasks. The presence of DarkCrystal Remote Administration Tool (DcRAT) further supports the theory that these communications are part of a C2 infrastructure.</p>
+<p><img src="image%2020.png" alt="image.png"></p>
+<h3 id="mitre--attck">MITRE  ATT&amp;CK</h3>
+<p><img src="image%2021.png" alt="image.png"></p>
+<p>appears to represent an ATT&amp;CK Navigator heatmap for a malicious activity pattern associated with DcRAT (DarkCrystal RAT). The MITRE ATT&amp;CK framework is used to categorize and describe the tactics and techniques employed by adversaries in cybersecurity incidents. Here&rsquo;s a breakdown of what the image likely conveys:</p>
+<h3 id="tactics-and-techniques">Tactics and Techniques:</h3>
+<ol>
+<li><strong>Defense Evasion</strong>
+<ul>
+<li><strong>Impair Defenses (1/9):</strong> Includes techniques like <strong>disabling Windows event logging</strong>, which makes it harder for defenders to detect malicious activity by preventing logs from being generated.</li>
+<li><strong>Virtualization/Sandbox Evasion (1/3):</strong> Techniques like <strong>time-based evasion</strong> are used to detect or avoid execution in virtual environments or sandboxes.</li>
+<li><strong>Masquerading (1/9):</strong> <strong>Renaming system utilities</strong> is a technique used to disguise malicious processes by giving them the names of legitimate system processes.</li>
+</ul>
+</li>
+<li><strong>Credential Access</strong>
+<ul>
+<li><strong>Unsecured Credentials (1/5):</strong> Techniques like <strong>credentials in files</strong> involve locating and extracting stored credentials from files on the system.</li>
+</ul>
+</li>
+<li><strong>Discovery</strong>
+<ul>
+<li><strong>Software Discovery (0/1):</strong> This involves gathering information about installed software on the system.</li>
+<li><strong>Query Registry (2/11):</strong> This technique involves querying the Windows registry to retrieve information that could aid in further malicious activity.</li>
+<li><strong>System Information Discovery (1/9):</strong> This technique includes gathering detailed information about the system, such as OS version, hardware configuration, etc.</li>
+<li><strong>System Location Discovery (0/1):</strong> Involves identifying the system’s physical location, which may be used to determine the context of an attack.</li>
+</ul>
+</li>
+<li><strong>Command &amp; Control (C2)</strong>
+<ul>
+<li><strong>Application Layer Protocol (0/4):</strong> In this context, it likely refers to the use of standard application protocols for communication with a C2 server. This could include HTTP, HTTPS, DNS, or other common protocols, which can be abused to exfiltrate data or receive commands.</li>
+</ul>
+</li>
+</ol>
+<h3 id="analysis-summary">Analysis Summary:</h3>
+<ul>
+<li><strong>DcRAT</strong> employs various techniques primarily focused on <strong>defense evasion</strong>, <strong>credential access</strong>, and <strong>system discovery</strong> to ensure persistence, evade detection, and gather intelligence about the system.</li>
+<li><strong>Command &amp; Control (C2)</strong> activities indicate that DcRAT is capable of using application layer protocols to communicate with its remote servers, suggesting that the RAT is able to maintain remote control over the infected system and possibly exfiltrate data.</li>
+</ul>
+<h1 id="conclusion-of-analysis-examination-of-dcrat-and-its-malicious-activity">Conclusion of Analysis: Examination of DcRAT and Its Malicious Activity</h1>
+<p>DcRAT (DarkCrystal Remote Administration Tool) is an advanced piece of malware that employs a wide range of techniques to evade detection, steal sensitive information, and maintain persistent control over compromised systems. Analysis of the sample revealed behaviors such as disabling Windows event logging and using time-based sandbox-evasion methods, highlighting its focus on stealth. The malware also disguises itself by renaming system utilities, further obscuring its presence on the machine.</p>
+<p>DcRAT aggressively leverages access to the host by locating and extracting credentials stored in local files. It performs extensive system reconnaissance, querying the Windows Registry, gathering hardware and software information, and identifying the system’s geographic location. This reconnaissance likely helps attackers profile infected hosts so they can tailor malicious actions to the specific environment.</p>
+<p>The malware also establishes command-and-control (C2) communication using common application-layer protocols such as HTTP and DNS. The repeated HTTP requests observed during analysis suggest potential data exfiltration or the receipt of remote commands from its C2 server. Additionally, the presence of dropped executables within user directories, combined with suspicious registry modifications, reinforces the malicious intent. DcRAT’s use of temporary or relocatable directories to store executables is a common tactic designed to preserve persistence while avoiding security controls.</p>
+<p>ATT&amp;CK Navigator mapping based on extracted indicators further confirms that DcRAT utilizes multiple tactics, including defense evasion, credential access, and system discovery, to successfully compromise systems and maintain long-term control.</p>
+
+		</section>
+
+		<div class="post-tags">
+			
+			
+			<nav class="nav tags">
+				<ul class="tags">
+					
+					<li><a href="/tags/routers">routers</a></li>
+					
+					<li><a href="/tags/qemu">qemu</a></li>
+					
+					<li><a href="/tags/simulation">simulation</a></li>
+					
+					<li><a href="/tags/ghidra">ghidra</a></li>
+					
+					<li><a href="/tags/reverse">reverse</a></li>
+					
+					<li><a href="/tags/uart">UART</a></li>
+					
+					<li><a href="/tags/spi-dump">SPI dump</a></li>
+					
+				</ul>
+			</nav>
+			
+			
+		</div>
+		</article>
+</main>
+<footer>
+  <div style="display:flex"><a class="soc" href="https://github.com/arzedlab/" rel="me" title="GitHub"><i data-feather="github"></i></a>
+    <a class="border"></a><a class="soc" href="https://www.linkedin.com/in/ravshan-rikhsiev/" rel="me" title="Linkedin"><i data-feather="linkedin"></i></a>
+    <a class="border"></a><a class="soc" href="https://twitter.com/arzedlab/" rel="me" title="Twitter"><i data-feather="twitter"></i></a>
+    <a class="border"></a></div>
+  <div class="footer-info">
+    2025  © Ravshan | Made with Love ❤️ <a href="https://twitter.com/arzedlab/"> My Twitter 🪽</a>
+  </div>
+</footer>
+<script>
+  feather.replace()
+</script></div>
+    </body>
+</html>

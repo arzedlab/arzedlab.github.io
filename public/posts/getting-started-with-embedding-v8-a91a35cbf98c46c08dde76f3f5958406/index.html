@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>Getting Started with Embedding V8 - Arzedlab 🪵</title><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="A beginner-friendly guide to embedding the V8 JavaScript engine into native applications. It covers initialization, contexts, script execution, and common pitfalls when integrating V8 with C&#43;&#43; projects." />
+	<meta property="og:image" content=""/>
+	<meta property="og:url" content="http://localhost:1313/posts/getting-started-with-embedding-v8-a91a35cbf98c46c08dde76f3f5958406/">
+  <meta property="og:site_name" content="Arzedlab 🪵">
+  <meta property="og:title" content="Getting Started with Embedding V8">
+  <meta property="og:description" content="A beginner-friendly guide to embedding the V8 JavaScript engine into native applications. It covers initialization, contexts, script execution, and common pitfalls when integrating V8 with C&#43;&#43; projects.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2023-07-06T00:00:00+00:00">
+    <meta property="article:modified_time" content="2023-07-06T00:00:00+00:00">
+    <meta property="article:tag" content="Embedding">
+    <meta property="article:tag" content="V8">
+    <meta property="article:tag" content="Internals">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Getting Started with Embedding V8">
+  <meta name="twitter:description" content="A beginner-friendly guide to embedding the V8 JavaScript engine into native applications. It covers initialization, contexts, script execution, and common pitfalls when integrating V8 with C&#43;&#43; projects.">
+<script src="http://localhost:1313/js/feather.min.js"></script>
+	
+	
+        <link href="http://localhost:1313/css/fonts.2c2227b81b1970a03e760aa2e6121cd01f87c88586803cbb282aa224720a765f.css" rel="stylesheet">
+	
+
+	
+	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:1313/css/main.7198d56e4fe53ab4610aa7f913b8d3fa7453003ac7791c64a6d6157aecbbced5.css" />
+
+	
+	
+
+	
+	
+
+	
+</head>
+<body>
+        <div class="content"><header>
+	<div class="main">
+		<a href="http://localhost:1313/">Arzedlab 🪵</a>
+	</div>
+	<nav>
+		
+		<a href="/">🏠 Home</a>
+		
+		<a href="/posts">🗂️ All posts</a>
+		
+		<a href="/about">💡 About Me</a>
+		
+		<a href="/papers">📑 Publications</a>
+		
+		<a href="/tags">🏷️ Tags</a>
+		
+		
+	</nav>
+</header>
+
+<main>
+	<article>
+		<div class="title">
+			<h1 class="title">Getting Started with Embedding V8</h1>
+			<div class="meta">Posted on Jul 6, 2023</div>
+		</div>
+		
+
+		
+		<div class="toc">
+		<strong>Table of contents:</strong>
+		<nav id="TableOfContents">
+  <ul>
+    <li><a href="#installing--testing-standalone-v8-application">Installing &amp; Testing Standalone V8 application</a></li>
+    <li><a href="#hello-world-example-hello_worldcc">Hello World example (hello_world.cc)</a></li>
+    <li><a href="#handles-and-garbage-collection"><strong>Handles and garbage collection</strong></a></li>
+    <li><a href="#contexts"><strong>Contexts</strong></a></li>
+    <li><a href="#templates"><strong>Templates</strong></a></li>
+    <li><a href="#accessors"><strong>Accessors</strong></a></li>
+    <li><a href="#accessing-static-global-variables"><strong>Accessing static global variables</strong></a></li>
+    <li><a href="#accessing-dynamic-variables"><strong>Accessing dynamic variables</strong></a></li>
+    <li><a href="#interceptors"><strong>Interceptors</strong></a>
+      <ul>
+        <li><a href="#security-model">Security model</a></li>
+        <li><a href="#exceptions">Exceptions</a></li>
+        <li><a href="#inheritance">Inheritance</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+		</div>
+
+		<section class="body">
+			<h1 id="getting-started-with-embedding-v8">Getting Started with Embedding V8</h1>
+<h2 id="installing--testing-standalone-v8-application">Installing &amp; Testing Standalone V8 application</h2>
+<ol>
+<li>Download the V8 source code</li>
+<li>Create a build configuration using the helper script:</li>
+</ol>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>tools/dev/v8gen.py x64.release.sample
+</span></span></code></pre></div><ol>
+<li>You can inspect and manually edit the build configuration by running:</li>
+</ol>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>gn args out.gn/x64.release.sample 
+</span></span></code></pre></div><ol>
+<li>Build the static library on a Linux 64 system:</li>
+</ol>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>ninja -C out.gn/x64.release.sample v8_monolith
+</span></span></code></pre></div><ol>
+<li>Compile <code>hello-world.cc</code>, linking to the static library created in the build process. For example, on 64bit Linux using the GNU compiler:</li>
+</ol>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>g++ -I. -Iinclude samples/hello-world.cc -o hello_world -fno-rtti -lv8_monolith -lv8_libbase -lv8_libplatform -ldl -Lout.gn/x64.release.sample/obj/ -pthread -std<span style="color:#ff79c6">=</span>c++17 -DV8_COMPRESS_POINTERS -DV8_ENABLE_SANDBOX
+</span></span></code></pre></div><ol>
+<li>For more complex code, V8 fails without an ICU data file. Copy this file to where your binary is stored:</li>
+</ol>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>cp out.gn/x64.release.sample/icudtl.dat .
+</span></span></code></pre></div><ol>
+<li>Run the <code>hello_world</code> executable file at the command line. e.g. On Linux, in the V8 directory, run:</li>
+</ol>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>./hello_world
+</span></span></code></pre></div><p>V8 as a standalone virtual machine has some key V8 concepts such as <strong>handles</strong>, <strong>scopes</strong>, and <strong>contexts.</strong> The V8 API provides functions for compiling and executing scripts,  accessing C++ methods and data structures, handling errors, and enabling  security checks. Your application can use V8 just like any other C++ library. Your C++ code accesses V8 through the V8 API by including the header <code>include/v8.h</code>.</p>
+<h2 id="hello-world-example-hello_worldcc">Hello World example (hello_world.cc)</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cpp" data-lang="cpp"><span style="display:flex;"><span><span style="color:#6272a4">// Copyright 2015 the V8 project authors. All rights reserved.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4">// Use of this source code is governed by a BSD-style license that can be
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4">// found in the LICENSE file.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">#include</span> <span style="color:#ff79c6">&lt;stdio.h&gt;</span><span style="color:#ff79c6">
+</span></span></span><span style="display:flex;"><span><span style="color:#ff79c6">#include</span> <span style="color:#ff79c6">&lt;stdlib.h&gt;</span><span style="color:#ff79c6">
+</span></span></span><span style="display:flex;"><span><span style="color:#ff79c6">#include</span> <span style="color:#ff79c6">&lt;string.h&gt;</span><span style="color:#ff79c6">
+</span></span></span><span style="display:flex;"><span><span style="color:#ff79c6"></span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">#include</span> <span style="color:#ff79c6">&#34;include/libplatform/libplatform.h&#34;</span><span style="color:#ff79c6">
+</span></span></span><span style="display:flex;"><span><span style="color:#ff79c6">#include</span> <span style="color:#ff79c6">&#34;include/v8.h&#34;</span><span style="color:#ff79c6">
+</span></span></span><span style="display:flex;"><span><span style="color:#ff79c6"></span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">int</span> <span style="color:#50fa7b">main</span>(<span style="color:#8be9fd">int</span> argc, <span style="color:#8be9fd">char</span><span style="color:#ff79c6">*</span> argv[]) {
+</span></span><span style="display:flex;"><span>  <span style="color:#6272a4">// Initialize V8.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>  v8<span style="color:#ff79c6">::</span>V8<span style="color:#ff79c6">::</span>InitializeICUDefaultLocation(argv[<span style="color:#bd93f9">0</span>]);
+</span></span><span style="display:flex;"><span>  v8<span style="color:#ff79c6">::</span>V8<span style="color:#ff79c6">::</span>InitializeExternalStartupData(argv[<span style="color:#bd93f9">0</span>]);
+</span></span><span style="display:flex;"><span>  std<span style="color:#ff79c6">::</span>unique_ptr<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Platform<span style="color:#ff79c6">&gt;</span> platform <span style="color:#ff79c6">=</span> v8<span style="color:#ff79c6">::</span>platform<span style="color:#ff79c6">::</span>NewDefaultPlatform();
+</span></span><span style="display:flex;"><span>  v8<span style="color:#ff79c6">::</span>V8<span style="color:#ff79c6">::</span>InitializePlatform(platform.get());
+</span></span><span style="display:flex;"><span>  v8<span style="color:#ff79c6">::</span>V8<span style="color:#ff79c6">::</span>Initialize();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#6272a4">// Create a new Isolate and make it the current one.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>  v8<span style="color:#ff79c6">::</span>Isolate<span style="color:#ff79c6">::</span>CreateParams create_params;
+</span></span><span style="display:flex;"><span>  create_params.array_buffer_allocator <span style="color:#ff79c6">=</span>
+</span></span><span style="display:flex;"><span>      v8<span style="color:#ff79c6">::</span>ArrayBuffer<span style="color:#ff79c6">::</span>Allocator<span style="color:#ff79c6">::</span>NewDefaultAllocator();
+</span></span><span style="display:flex;"><span>  v8<span style="color:#ff79c6">::</span>Isolate<span style="color:#ff79c6">*</span> isolate <span style="color:#ff79c6">=</span> v8<span style="color:#ff79c6">::</span>Isolate<span style="color:#ff79c6">::</span>New(create_params);
+</span></span><span style="display:flex;"><span>  {
+</span></span><span style="display:flex;"><span>    v8<span style="color:#ff79c6">::</span>Isolate<span style="color:#ff79c6">::</span>Scope isolate_scope(isolate);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">// Create a stack-allocated handle scope.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    v8<span style="color:#ff79c6">::</span>HandleScope handle_scope(isolate);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">// Create a new context.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Context<span style="color:#ff79c6">&gt;</span> context <span style="color:#ff79c6">=</span> v8<span style="color:#ff79c6">::</span>Context<span style="color:#ff79c6">::</span>New(isolate);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">// Enter the context for compiling and running the hello world script.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    v8<span style="color:#ff79c6">::</span>Context<span style="color:#ff79c6">::</span>Scope context_scope(context);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>      <span style="color:#6272a4">// Create a string containing the JavaScript source code.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">&gt;</span> source <span style="color:#ff79c6">=</span>
+</span></span><span style="display:flex;"><span>          v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">::</span>NewFromUtf8(isolate, <span style="color:#f1fa8c">&#34;&#39;Hello&#39; + &#39;, World!&#39;&#34;</span>,
+</span></span><span style="display:flex;"><span>                                  v8<span style="color:#ff79c6">::</span>NewStringType<span style="color:#ff79c6">::</span>kNormal)
+</span></span><span style="display:flex;"><span>              .ToLocalChecked();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      <span style="color:#6272a4">// Compile the source code.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Script<span style="color:#ff79c6">&gt;</span> script <span style="color:#ff79c6">=</span>
+</span></span><span style="display:flex;"><span>          v8<span style="color:#ff79c6">::</span>Script<span style="color:#ff79c6">::</span>Compile(context, source).ToLocalChecked();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      <span style="color:#6272a4">// Run the script to get the result.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Value<span style="color:#ff79c6">&gt;</span> result <span style="color:#ff79c6">=</span> script<span style="color:#ff79c6">-&gt;</span>Run(context).ToLocalChecked();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      <span style="color:#6272a4">// Convert the result to an UTF8 string and print it.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">::</span>Utf8Value utf8(isolate, result);
+</span></span><span style="display:flex;"><span>      printf(<span style="color:#f1fa8c">&#34;%s</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">&#34;</span>, <span style="color:#ff79c6">*</span>utf8);
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>      <span style="color:#6272a4">// Use the JavaScript API to generate a WebAssembly module.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      <span style="color:#6272a4">//
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      <span style="color:#6272a4">// |bytes| contains the binary format for the following module:
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      <span style="color:#6272a4">//
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      <span style="color:#6272a4">//     (func (export &#34;add&#34;) (param i32 i32) (result i32)
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      <span style="color:#6272a4">//       get_local 0
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      <span style="color:#6272a4">//       get_local 1
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      <span style="color:#6272a4">//       i32.add)
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      <span style="color:#6272a4">//
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      <span style="color:#ff79c6">const</span> <span style="color:#8be9fd">char</span><span style="color:#ff79c6">*</span> csource <span style="color:#ff79c6">=</span> R<span style="color:#f1fa8c">&#34;(</span>
+</span></span><span style="display:flex;"><span>        let bytes <span style="color:#ff79c6">=</span> <span style="color:#ff79c6">new</span> Uint8Array([
+</span></span><span style="display:flex;"><span>          <span style="color:#bd93f9">0x00</span>, <span style="color:#bd93f9">0x61</span>, <span style="color:#bd93f9">0x73</span>, <span style="color:#bd93f9">0x6d</span>, <span style="color:#bd93f9">0x01</span>, <span style="color:#bd93f9">0x00</span>, <span style="color:#bd93f9">0x00</span>, <span style="color:#bd93f9">0x00</span>, <span style="color:#bd93f9">0x01</span>, <span style="color:#bd93f9">0x07</span>, <span style="color:#bd93f9">0x01</span>,
+</span></span><span style="display:flex;"><span>          <span style="color:#bd93f9">0x60</span>, <span style="color:#bd93f9">0x02</span>, <span style="color:#bd93f9">0x7f</span>, <span style="color:#bd93f9">0x7f</span>, <span style="color:#bd93f9">0x01</span>, <span style="color:#bd93f9">0x7f</span>, <span style="color:#bd93f9">0x03</span>, <span style="color:#bd93f9">0x02</span>, <span style="color:#bd93f9">0x01</span>, <span style="color:#bd93f9">0x00</span>, <span style="color:#bd93f9">0x07</span>,
+</span></span><span style="display:flex;"><span>          <span style="color:#bd93f9">0x07</span>, <span style="color:#bd93f9">0x01</span>, <span style="color:#bd93f9">0x03</span>, <span style="color:#bd93f9">0x61</span>, <span style="color:#bd93f9">0x64</span>, <span style="color:#bd93f9">0x64</span>, <span style="color:#bd93f9">0x00</span>, <span style="color:#bd93f9">0x00</span>, <span style="color:#bd93f9">0x0a</span>, <span style="color:#bd93f9">0x09</span>, <span style="color:#bd93f9">0x01</span>,
+</span></span><span style="display:flex;"><span>          <span style="color:#bd93f9">0x07</span>, <span style="color:#bd93f9">0x00</span>, <span style="color:#bd93f9">0x20</span>, <span style="color:#bd93f9">0x00</span>, <span style="color:#bd93f9">0x20</span>, <span style="color:#bd93f9">0x01</span>, <span style="color:#bd93f9">0x6a</span>, <span style="color:#bd93f9">0x0b</span>
+</span></span><span style="display:flex;"><span>        ]);
+</span></span><span style="display:flex;"><span>        let module <span style="color:#ff79c6">=</span> <span style="color:#ff79c6">new</span> WebAssembly.Module(bytes);
+</span></span><span style="display:flex;"><span>        let instance <span style="color:#ff79c6">=</span> <span style="color:#ff79c6">new</span> WebAssembly.Instance(module);
+</span></span><span style="display:flex;"><span>        instance.exports.add(<span style="color:#bd93f9">3</span>, <span style="color:#bd93f9">4</span>);
+</span></span><span style="display:flex;"><span>      )<span style="color:#f1fa8c">&#34;;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      <span style="color:#6272a4">// Create a string containing the JavaScript source code.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">&gt;</span> source <span style="color:#ff79c6">=</span>
+</span></span><span style="display:flex;"><span>          v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">::</span>NewFromUtf8(isolate, csource, v8<span style="color:#ff79c6">::</span>NewStringType<span style="color:#ff79c6">::</span>kNormal)
+</span></span><span style="display:flex;"><span>              .ToLocalChecked();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      <span style="color:#6272a4">// Compile the source code.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Script<span style="color:#ff79c6">&gt;</span> script <span style="color:#ff79c6">=</span>
+</span></span><span style="display:flex;"><span>          v8<span style="color:#ff79c6">::</span>Script<span style="color:#ff79c6">::</span>Compile(context, source).ToLocalChecked();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      <span style="color:#6272a4">// Run the script to get the result.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Value<span style="color:#ff79c6">&gt;</span> result <span style="color:#ff79c6">=</span> script<span style="color:#ff79c6">-&gt;</span>Run(context).ToLocalChecked();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      <span style="color:#6272a4">// Convert the result to a uint32 and print it.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      <span style="color:#8be9fd">uint32_t</span> number <span style="color:#ff79c6">=</span> result<span style="color:#ff79c6">-&gt;</span>Uint32Value(context).ToChecked();
+</span></span><span style="display:flex;"><span>      printf(<span style="color:#f1fa8c">&#34;3 + 4 = %u</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">&#34;</span>, number);
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#6272a4">// Dispose the isolate and tear down V8.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>  isolate<span style="color:#ff79c6">-&gt;</span>Dispose();
+</span></span><span style="display:flex;"><span>  v8<span style="color:#ff79c6">::</span>V8<span style="color:#ff79c6">::</span>Dispose();
+</span></span><span style="display:flex;"><span>  v8<span style="color:#ff79c6">::</span>V8<span style="color:#ff79c6">::</span>ShutdownPlatform();
+</span></span><span style="display:flex;"><span>  <span style="color:#ff79c6">delete</span> create_params.array_buffer_allocator;
+</span></span><span style="display:flex;"><span>  <span style="color:#ff79c6">return</span> <span style="color:#bd93f9">0</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h2 id="handles-and-garbage-collection"><strong>Handles and garbage collection</strong></h2>
+<p>A <strong>handle</strong> provides a reference(link) to a JavaScript object’s location in the heap. The V8 garbage collector reclaims memory used by objects that can no longer again be accessed. During the garbage collection process the garbage collector often moves objects to different locations in the heap. When the garbage collector moves an object the garbage collector also updates all handles that refer to the object with the object’s new location.</p>
+<p>An object is considered garbage if it is <strong>inaccessible</strong> from JavaScript and there are no handles that refer to it. From time to time the garbage collector removes all objects considered to be garbage. V8’s garbage collection mechanism is key to V8’s performance.</p>
+<p><strong>There are several types of handles:</strong></p>
+<ul>
+<li>
+<p><strong>Local handles</strong> are held on a stack and are deleted when the appropriate <strong>destructor</strong> is called. These handles’ lifetime is determined by a <strong>handle scope</strong>, which is often created at the beginning of a function call. When the handle scope is deleted, the garbage collector is free to deallocate those objects previously referenced by handles in the handle scope, provided they are no longer accessible from JavaScript or other handles. This type of handle is used in the hello world example above.</p>
+<p>Local handles have the class <code>Local&lt;SomeType&gt;</code></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cpp" data-lang="cpp"><span style="display:flex;"><span>...
+</span></span><span style="display:flex;"><span>v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Context<span style="color:#ff79c6">&gt;</span> context <span style="color:#ff79c6">=</span> v8<span style="color:#ff79c6">::</span>Context<span style="color:#ff79c6">::</span>New(isolate);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#6272a4">// Enter the context for compiling and running the hello world script.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>    v8<span style="color:#ff79c6">::</span>Context<span style="color:#ff79c6">::</span>Scope context_scope(context);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>      <span style="color:#6272a4">// Create a string containing the JavaScript source code.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">&gt;</span> source <span style="color:#ff79c6">=</span>
+</span></span><span style="display:flex;"><span>          v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">::</span>NewFromUtf8(isolate, <span style="color:#f1fa8c">&#34;&#39;Hello&#39; + &#39;, World!&#39;&#34;</span>,
+</span></span><span style="display:flex;"><span>                                  v8<span style="color:#ff79c6">::</span>NewStringType<span style="color:#ff79c6">::</span>kNormal)
+</span></span><span style="display:flex;"><span>              .ToLocalChecked();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      <span style="color:#6272a4">// Compile the source code.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Script<span style="color:#ff79c6">&gt;</span> script <span style="color:#ff79c6">=</span>
+</span></span><span style="display:flex;"><span>          v8<span style="color:#ff79c6">::</span>Script<span style="color:#ff79c6">::</span>Compile(context, source).ToLocalChecked();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      <span style="color:#6272a4">// Run the script to get the result.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Value<span style="color:#ff79c6">&gt;</span> result <span style="color:#ff79c6">=</span> script<span style="color:#ff79c6">-&gt;</span>Run(context).ToLocalChecked();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      <span style="color:#6272a4">// Convert the result to an UTF8 string and print it.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">::</span>Utf8Value utf8(isolate, result);
+</span></span><span style="display:flex;"><span>      printf(<span style="color:#f1fa8c">&#34;%s</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">&#34;</span>, <span style="color:#ff79c6">*</span>utf8);
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>...
+</span></span><span style="display:flex;"><span><span style="color:#6272a4">// Create a string containing the JavaScript source code.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">&gt;</span> source <span style="color:#ff79c6">=</span>
+</span></span><span style="display:flex;"><span>          v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">::</span>NewFromUtf8(isolate, csource, v8<span style="color:#ff79c6">::</span>NewStringType<span style="color:#ff79c6">::</span>kNormal)
+</span></span><span style="display:flex;"><span>              .ToLocalChecked();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      <span style="color:#6272a4">// Compile the source code.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Script<span style="color:#ff79c6">&gt;</span> script <span style="color:#ff79c6">=</span>
+</span></span><span style="display:flex;"><span>          v8<span style="color:#ff79c6">::</span>Script<span style="color:#ff79c6">::</span>Compile(context, source).ToLocalChecked();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      <span style="color:#6272a4">// Run the script to get the result.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>      v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Value<span style="color:#ff79c6">&gt;</span> result <span style="color:#ff79c6">=</span> script<span style="color:#ff79c6">-&gt;</span>Run(context).ToLocalChecked();
+</span></span><span style="display:flex;"><span>...
+</span></span></code></pre></div><p><strong>Note:</strong> The handle stack is not part of the C++ call  stack, but the handle scopes are embedded in the C++ stack. Handle scopes can only be stack-allocated, not allocated with <code>new</code>.</p>
+<hr>
+</li>
+<li>
+<p><strong>Persistent handles</strong> provide a reference to a heap-allocated JavaScript  Object, just like a local handle. There are two flavors, which differ in the lifetime management of the reference they handle. Use a persistent handle when you need to keep a reference to an object for more than one  function call, or when handle lifetimes do not correspond to C++ scopes. Google Chrome, for example, uses persistent handles to refer to Document Object Model (DOM) nodes. A persistent handle can be made weak, using <code>PersistentBase::SetWeak</code>, to trigger a callback from the garbage collector when the only references to an object are from weak persistent handles.</p>
+<ul>
+<li>A <code>UniquePersistent&lt;SomeType&gt;</code> handle relies on C++ constructors and destructors to manage the lifetime of the underlying object.</li>
+<li>A <code>Persistent&lt;SomeType&gt;</code> can be constructed with its constructor, but must be explicitly cleared with <code>Persistent::Reset</code>.</li>
+</ul>
+<hr>
+</li>
+<li>
+<p>There are other types of handles which are rarely used, that we will only briefly mention here:</p>
+<ul>
+<li><strong>Eternal</strong> is a persistent handle for JavaScript objects that  are expected to never be deleted. It is cheaper to use because it relieves the garbage collector from determining the liveness of that object.</li>
+<li>Both <strong>Persistent</strong> and <strong>UniquePersistent</strong> cannot be copied, which makes them unsuitable as values with pre-C++11 standard library containers. <strong>PersistentValuesMap</strong> and <strong>PersistentValueVector</strong> provide container classes for persistent values, with map and
+vector-like semantics. C++11 embedders do not require these, since C++11 move semantics solve the underlying problem.</li>
+</ul>
+</li>
+</ul>
+<p>Of course, creating a local handle every time you create an object can result in a lot of handles! This is where handle scopes are very useful. You can think of a handle scope as a container that holds lots of handles. When the handle scope’s destructor is called all handles created within that scope are removed from the stack. As you would expect, this results in the objects to which the handles point being eligible for deletion from the heap by the garbage collector.</p>
+<p><img src="Untitled.png" alt="Untitled"></p>
+<p>When the destructor <code>HandleScope::~HandleScope</code> is called, the handle scope is deleted. Objects referred to by handles within the deleted handle scope are eligible for removal in the next garbage
+collection if there are no other references to them. The garbage collector can also remove the <code>source_obj</code>, and <code>script_obj</code> objects from the heap as they are no longer referenced by any handles or otherwise reachable from JavaScript. Since the context handle is a persistent handle, it is not removed when the handle scope is exited. The only way to remove the context handle is to explicitly call <code>Reset</code> on it.</p>
+<p><strong>Note:</strong> Throughout this document the term “handle” refers to a local handle. When discussing a persistent handle, that term is used in full.</p>
+<hr>
+<p>It is important to be aware of one common pitfall with this model: <em>you cannot return a local handle directly from a function that declares a handle scope</em>.  If you do the local handle you’re trying to return will end up being  deleted by the handle scope’s destructor immediately before the function
+returns. The proper way to return a local handle is construct an <code>EscapableHandleScope</code> instead of a <code>HandleScope</code> and to call the <code>Escape</code> method on the handle scope, passing in the handle whose value you want to return. Here’s an example of how that works in practice:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cpp" data-lang="cpp"><span style="display:flex;"><span><span style="color:#6272a4">// This function returns a new array with three elements, x, y, and z.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>Local<span style="color:#ff79c6">&lt;</span>Array<span style="color:#ff79c6">&gt;</span> NewPointArray(<span style="color:#8be9fd">int</span> x, <span style="color:#8be9fd">int</span> y, <span style="color:#8be9fd">int</span> z) {
+</span></span><span style="display:flex;"><span>  v8<span style="color:#ff79c6">::</span>Isolate<span style="color:#ff79c6">*</span> isolate <span style="color:#ff79c6">=</span> v8<span style="color:#ff79c6">::</span>Isolate<span style="color:#ff79c6">::</span>GetCurrent();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#6272a4">// We will be creating temporary handles so we use a handle scope.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>  v8<span style="color:#ff79c6">::</span>EscapableHandleScope handle_scope(isolate);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#6272a4">// Create a new empty array.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>  v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Array<span style="color:#ff79c6">&gt;</span> array <span style="color:#ff79c6">=</span> v8<span style="color:#ff79c6">::</span>Array<span style="color:#ff79c6">::</span>New(isolate, <span style="color:#bd93f9">3</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#6272a4">// Return an empty result if there was an error creating the array.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>  <span style="color:#ff79c6">if</span> (array.IsEmpty())
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">return</span> v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Array<span style="color:#ff79c6">&gt;</span>();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#6272a4">// Fill out the values
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>  array<span style="color:#ff79c6">-&gt;</span>Set(<span style="color:#bd93f9">0</span>, Integer<span style="color:#ff79c6">::</span>New(isolate, x));
+</span></span><span style="display:flex;"><span>  array<span style="color:#ff79c6">-&gt;</span>Set(<span style="color:#bd93f9">1</span>, Integer<span style="color:#ff79c6">::</span>New(isolate, y));
+</span></span><span style="display:flex;"><span>  array<span style="color:#ff79c6">-&gt;</span>Set(<span style="color:#bd93f9">2</span>, Integer<span style="color:#ff79c6">::</span>New(isolate, z));
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#6272a4">// Return the value through Escape.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>  <span style="color:#ff79c6">return</span> handle_scope.Escape(array);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>The <code>Escape</code> method copies the value of its argument into the enclosing scope, deletes all its local handles, and then gives back the new handle copy which can safely be returned.</p>
+<h2 id="contexts"><strong>Contexts</strong></h2>
+<p>In V8, a context is an execution environment that allows separate, unrelated, JavaScript applications to run in a single instance of V8. You must explicitly specify the context in which you want any JavaScript code to be run.</p>
+<p>Why is this necessary? Because JavaScript provides a set of built-in utility functions and objects that can be changed by JavaScript code. For example, if two entirely unrelated JavaScript functions both changed the global object in the same way then unexpected results are fairly likely to happen.</p>
+<p>In terms of CPU time and memory, it might seem an expensive operation  to create a new execution context given the number of built-in objects that must be built. However, V8’s extensive caching ensures that, while the first context you create is somewhat expensive, subsequent contexts
+are much cheaper. This is because the first context needs to create the built-in objects and parse the built-in JavaScript code while subsequent contexts only have to create the built-in objects for their context. With the V8 snapshot feature (activated with build option <code>snapshot=yes</code>,
+which is the default) the time spent creating the first context will be highly optimized as a snapshot includes a serialized heap which contains already compiled code for the built-in JavaScript code. Along with garbage collection, V8’s extensive caching is also key to V8’s
+performance.</p>
+<p>When you have created a context you can enter and exit it any number of times. While you are in context A you can also enter a different context, B, which means that you replace A as the current context with B. When you exit B then A is restored as the current context. This is illustrated below:</p>
+<p><img src="Untitled%201.png" alt="Untitled"></p>
+<p>Note that the built-in utility functions and objects of each context are kept separate. You can optionally set a security token when you create a context. See the <a href="https://v8.dev/docs/embed#security-model">Security Model</a> section for more information. The  motivation for using contexts in V8 was so that each window and iframe
+in a browser can have its own fresh JavaScript environment.</p>
+<h2 id="templates"><strong>Templates</strong></h2>
+<p>A template is a blueprint for JavaScript functions and objects in a context. You can use a template to wrap C++ functions and data structures within JavaScript objects so that they can be manipulated by JavaScript scripts. For example, Google Chrome uses templates to wrap C++ DOM nodes as JavaScript objects and to install functions in the global namespace. You can create a set of templates and then use the same ones for every new context you make. You can have as many templates as you require. However you can only have one instance of any template in any given context.</p>
+<p>In JavaScript there is a strong duality between functions and objects. To create a new type of object in Java or C++ you would typically define a new class. In JavaScript you create a new function instead, and create instances using the function as a constructor. The layout and functionality of a JavaScript object is closely tied to the function that constructed it. This is reflected in the way V8 templates work. There are two types of templates:</p>
+<ul>
+<li>
+<p>Function templates</p>
+<p>A function template is the blueprint for a single function. You create a JavaScript instance of the template by calling the template’s <code>GetFunction</code> method from within the context in which you wish to instantiate the JavaScript function. You can also associate a C++ callback with a
+function template which is called when the JavaScript function instance is invoked.</p>
+</li>
+<li>
+<p>Object templates</p>
+<p>Each function template has an associated object template. This is used to configure objects created with this function as their constructor. You can associate two types of C++ callbacks with object templates:</p>
+<ul>
+<li>accessor callbacks are invoked when a specific object property is accessed by a script</li>
+<li>interceptor callbacks are invoked when any object property is accessed by a script</li>
+</ul>
+</li>
+</ul>
+<p><a href="https://v8.dev/docs/embed#accessors">Accessors</a> and <a href="https://v8.dev/docs/embed#interceptors">interceptors</a> are discussed later in this document.</p>
+<p>The following code provides an example of creating a template for the global object and setting the built-in global functions.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cpp" data-lang="cpp"><span style="display:flex;"><span><span style="color:#6272a4">// Create a template for the global object and set the
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4">// built-in global functions.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>ObjectTemplate<span style="color:#ff79c6">&gt;</span> global <span style="color:#ff79c6">=</span> v8<span style="color:#ff79c6">::</span>ObjectTemplate<span style="color:#ff79c6">::</span>New(isolate);
+</span></span><span style="display:flex;"><span>global<span style="color:#ff79c6">-&gt;</span>Set(v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">::</span>NewFromUtf8(isolate, <span style="color:#f1fa8c">&#34;log&#34;</span>),
+</span></span><span style="display:flex;"><span>            v8<span style="color:#ff79c6">::</span>FunctionTemplate<span style="color:#ff79c6">::</span>New(isolate, LogCallback));
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4">// Each processor gets its own context so different processors
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4">// do not affect each other.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>v8<span style="color:#ff79c6">::</span>Persistent<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Context<span style="color:#ff79c6">&gt;</span> context <span style="color:#ff79c6">=</span>
+</span></span><span style="display:flex;"><span>    v8<span style="color:#ff79c6">::</span>Context<span style="color:#ff79c6">::</span>New(isolate, <span style="color:#ff79c6">nullptr</span>, global);
+</span></span></code></pre></div><p>This example code is taken from <code>JsHttpProcessor::Initializer</code> in the <code>process.cc</code> sample.</p>
+<h2 id="accessors"><strong>Accessors</strong></h2>
+<p>An accessor is a C++ callback that calculates and returns a value when an object property is accessed by a JavaScript script. Accessors are configured through an object template, using the <code>SetAccessor</code> method. This method takes the name of the property with which it is
+associated and two callbacks to run when a script attempts to read or
+write the property.</p>
+<p>The complexity of an accessor depends upon the type of data you are manipulating:</p>
+<ul>
+<li><a href="https://v8.dev/docs/embed#accessing-static-global-variables">Accessing static global variables</a></li>
+<li><a href="https://v8.dev/docs/embed#accessing-dynamic-variables">Accessing dynamic variables</a></li>
+</ul>
+<h2 id="accessing-static-global-variables"><strong>Accessing static global variables</strong></h2>
+<p>Let’s say there are two C++ integer variables, <code>x</code> and <code>y</code> that are to be made available to JavaScript as global variables within a context. To do this, you need to call C++ accessor functions whenever a
+script reads or writes those variables. These accessor functions convert a C++ integer to a JavaScript integer using <code>Integer::New</code>, and convert a JavaScript integer to a C++ integer using <code>Int32Value</code>. An example is provided below:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cpp" data-lang="cpp"><span style="display:flex;"><span><span style="color:#8be9fd">void</span> <span style="color:#50fa7b">XGetter</span>(v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">&gt;</span> property,
+</span></span><span style="display:flex;"><span>              <span style="color:#ff79c6">const</span> v8<span style="color:#ff79c6">::</span>PropertyCallbackInfo<span style="color:#ff79c6">&lt;</span>Value<span style="color:#ff79c6">&gt;&amp;</span> info) {
+</span></span><span style="display:flex;"><span>  info.GetReturnValue().Set(x);
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">void</span> <span style="color:#50fa7b">XSetter</span>(v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">&gt;</span> property, v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Value<span style="color:#ff79c6">&gt;</span> value,
+</span></span><span style="display:flex;"><span>             <span style="color:#ff79c6">const</span> v8<span style="color:#ff79c6">::</span>PropertyCallbackInfo<span style="color:#ff79c6">&lt;</span><span style="color:#8be9fd">void</span><span style="color:#ff79c6">&gt;&amp;</span> info) {
+</span></span><span style="display:flex;"><span>  x <span style="color:#ff79c6">=</span> value<span style="color:#ff79c6">-&gt;</span>Int32Value();
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4">// YGetter/YSetter are so similar they are omitted for brevity
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>
+</span></span><span style="display:flex;"><span>v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>ObjectTemplate<span style="color:#ff79c6">&gt;</span> global_templ <span style="color:#ff79c6">=</span> v8<span style="color:#ff79c6">::</span>ObjectTemplate<span style="color:#ff79c6">::</span>New(isolate);
+</span></span><span style="display:flex;"><span>global_templ<span style="color:#ff79c6">-&gt;</span>SetAccessor(v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">::</span>NewFromUtf8(isolate, <span style="color:#f1fa8c">&#34;x&#34;</span>),
+</span></span><span style="display:flex;"><span>                          XGetter, XSetter);
+</span></span><span style="display:flex;"><span>global_templ<span style="color:#ff79c6">-&gt;</span>SetAccessor(v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">::</span>NewFromUtf8(isolate, <span style="color:#f1fa8c">&#34;y&#34;</span>),
+</span></span><span style="display:flex;"><span>                          YGetter, YSetter);
+</span></span><span style="display:flex;"><span>v8<span style="color:#ff79c6">::</span>Persistent<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Context<span style="color:#ff79c6">&gt;</span> context <span style="color:#ff79c6">=</span>
+</span></span><span style="display:flex;"><span>    v8<span style="color:#ff79c6">::</span>Context<span style="color:#ff79c6">::</span>v8<span style="color:#ff79c6">::</span>New(isolate, <span style="color:#ff79c6">nullptr</span>, global_templ);
+</span></span></code></pre></div><p>Note that the object template in the code above is created at the same time as the context. The template could have been created in advance and then used for any number of contexts.</p>
+<h2 id="accessing-dynamic-variables"><strong>Accessing dynamic variables</strong></h2>
+<p>In the preceding example the variables were static and global. What if the data being manipulated is dynamic, as is true of the DOM tree in a browser? Let’s imagine <code>x</code> and <code>y</code> are object fields on the C++ class <code>Point</code>:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cpp" data-lang="cpp"><span style="display:flex;"><span><span style="color:#ff79c6">class</span> <span style="color:#50fa7b">Point</span> {
+</span></span><span style="display:flex;"><span> <span style="color:#ff79c6">public</span><span style="color:#ff79c6">:</span>
+</span></span><span style="display:flex;"><span>  Point(<span style="color:#8be9fd">int</span> x, <span style="color:#8be9fd">int</span> y) <span style="color:#ff79c6">:</span> x_(x), y_(y) { }
+</span></span><span style="display:flex;"><span>  <span style="color:#8be9fd">int</span> x_, y_;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>To make any number of C++ <code>point</code> instances available to JavaScript we need to create one JavaScript object for each C++ <code>point</code> and make a connection between the JavaScript object and the C++ instance. This is done with external values and internal object fields.</p>
+<p>First create an object template for the <code>point</code> wrapper object:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cpp" data-lang="cpp"><span style="display:flex;"><span>v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>ObjectTemplate<span style="color:#ff79c6">&gt;</span> point_templ <span style="color:#ff79c6">=</span> v8<span style="color:#ff79c6">::</span>ObjectTemplate<span style="color:#ff79c6">::</span>New(isolate);
+</span></span></code></pre></div><p>Each JavaScript <code>point</code> object keeps a reference to the C++ object for which it is a wrapper with an internal field. These fields are so named because they cannot be accessed from within JavaScript,
+they can only be accessed from C++ code. An object can have any number of internal fields, the number of internal fields is set on the object template as follows:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cpp" data-lang="cpp"><span style="display:flex;"><span>point_templ<span style="color:#ff79c6">-&gt;</span>SetInternalFieldCount(<span style="color:#bd93f9">1</span>);
+</span></span></code></pre></div><p>Here the internal field count is set to <code>1</code> which means the object has one internal field, with an index of <code>0</code>, that points to a C++ object.</p>
+<p>Add the <code>x</code> and <code>y</code> accessors to the template:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cpp" data-lang="cpp"><span style="display:flex;"><span>point_templ<span style="color:#ff79c6">-&gt;</span>SetAccessor(v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">::</span>NewFromUtf8(isolate, <span style="color:#f1fa8c">&#34;x&#34;</span>),
+</span></span><span style="display:flex;"><span>                         GetPointX, SetPointX);
+</span></span><span style="display:flex;"><span>point_templ<span style="color:#ff79c6">-&gt;</span>SetAccessor(v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">::</span>NewFromUtf8(isolate, <span style="color:#f1fa8c">&#34;y&#34;</span>),
+</span></span><span style="display:flex;"><span>                         GetPointY, SetPointY);
+</span></span></code></pre></div><p>Next, wrap a C++ point by creating a new instance of the template and then setting the internal field <code>0</code> to an external wrapper around the point <code>p</code>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cpp" data-lang="cpp"><span style="display:flex;"><span>Point<span style="color:#ff79c6">*</span> p <span style="color:#ff79c6">=</span> ...;
+</span></span><span style="display:flex;"><span>v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Object<span style="color:#ff79c6">&gt;</span> obj <span style="color:#ff79c6">=</span> point_templ<span style="color:#ff79c6">-&gt;</span>NewInstance();
+</span></span><span style="display:flex;"><span>obj<span style="color:#ff79c6">-&gt;</span>SetInternalField(<span style="color:#bd93f9">0</span>, v8<span style="color:#ff79c6">::</span>External<span style="color:#ff79c6">::</span>New(isolate, p));
+</span></span></code></pre></div><p>The external object is simply a wrapper around a <code>void*</code>. External objects can only be used to store reference values in internal fields. JavaScript objects can not have references to C++ objects
+directly so the external value is used as a &ldquo;bridge&rdquo; to go from JavaScript into C++. In that sense external values are the opposite of handles since handles lets C++ make references to JavaScript objects.</p>
+<p>Here’s the definition of the <code>get</code> and <code>set</code> accessors for <code>x</code>, the <code>y</code> accessor definitions are identical except <code>y</code> replaces <code>x</code>:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cpp" data-lang="cpp"><span style="display:flex;"><span><span style="color:#8be9fd">void</span> <span style="color:#50fa7b">GetPointX</span>(Local<span style="color:#ff79c6">&lt;</span>String<span style="color:#ff79c6">&gt;</span> property,
+</span></span><span style="display:flex;"><span>               <span style="color:#ff79c6">const</span> PropertyCallbackInfo<span style="color:#ff79c6">&lt;</span>Value<span style="color:#ff79c6">&gt;&amp;</span> info) {
+</span></span><span style="display:flex;"><span>  v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Object<span style="color:#ff79c6">&gt;</span> self <span style="color:#ff79c6">=</span> info.Holder();
+</span></span><span style="display:flex;"><span>  v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>External<span style="color:#ff79c6">&gt;</span> wrap <span style="color:#ff79c6">=</span>
+</span></span><span style="display:flex;"><span>      v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>External<span style="color:#ff79c6">&gt;::</span>Cast(self<span style="color:#ff79c6">-&gt;</span>GetInternalField(<span style="color:#bd93f9">0</span>));
+</span></span><span style="display:flex;"><span>  <span style="color:#8be9fd">void</span><span style="color:#ff79c6">*</span> ptr <span style="color:#ff79c6">=</span> wrap<span style="color:#ff79c6">-&gt;</span>Value();
+</span></span><span style="display:flex;"><span>  <span style="color:#8be9fd">int</span> value <span style="color:#ff79c6">=</span> <span style="color:#ff79c6">static_cast</span><span style="color:#ff79c6">&lt;</span>Point<span style="color:#ff79c6">*&gt;</span>(ptr)<span style="color:#ff79c6">-&gt;</span>x_;
+</span></span><span style="display:flex;"><span>  info.GetReturnValue().Set(value);
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">void</span> <span style="color:#50fa7b">SetPointX</span>(v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">&gt;</span> property, v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Value<span style="color:#ff79c6">&gt;</span> value,
+</span></span><span style="display:flex;"><span>               <span style="color:#ff79c6">const</span> v8<span style="color:#ff79c6">::</span>PropertyCallbackInfo<span style="color:#ff79c6">&lt;</span><span style="color:#8be9fd">void</span><span style="color:#ff79c6">&gt;&amp;</span> info) {
+</span></span><span style="display:flex;"><span>  v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Object<span style="color:#ff79c6">&gt;</span> self <span style="color:#ff79c6">=</span> info.Holder();
+</span></span><span style="display:flex;"><span>  v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>External<span style="color:#ff79c6">&gt;</span> wrap <span style="color:#ff79c6">=</span>
+</span></span><span style="display:flex;"><span>      v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>External<span style="color:#ff79c6">&gt;::</span>Cast(self<span style="color:#ff79c6">-&gt;</span>GetInternalField(<span style="color:#bd93f9">0</span>));
+</span></span><span style="display:flex;"><span>  <span style="color:#8be9fd">void</span><span style="color:#ff79c6">*</span> ptr <span style="color:#ff79c6">=</span> wrap<span style="color:#ff79c6">-&gt;</span>Value();
+</span></span><span style="display:flex;"><span>  <span style="color:#ff79c6">static_cast</span><span style="color:#ff79c6">&lt;</span>Point<span style="color:#ff79c6">*&gt;</span>(ptr)<span style="color:#ff79c6">-&gt;</span>x_ <span style="color:#ff79c6">=</span> value<span style="color:#ff79c6">-&gt;</span>Int32Value();
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Accessors extract the reference to the <code>point</code> object that was wrapped by the JavaScript object and then read and writes the associated field. This way these generic accessors can be used on any
+number of wrapped point objects.</p>
+<h2 id="interceptors"><strong>Interceptors</strong></h2>
+<p>You can also specify a callback for whenever a script accesses any object property. These are called interceptors. For efficiency, there are two types of interceptors:</p>
+<ul>
+<li><em>named property interceptors</em> - called when accessing properties with string names.An example of this, in a browser environment, is <code>document.theFormName.elementName</code>.</li>
+<li><em>indexed property interceptors</em> - called when accessing indexed properties. An example of this, in a browser environment, is <code>document.forms.elements[0]</code>.</li>
+</ul>
+<p>The sample <code>process.cc</code>, provided with the V8 source code, includes an example of using interceptors. In the following code snippet <code>SetNamedPropertyHandler</code> specifies the <code>MapGet</code> and <code>MapSet</code> interceptors:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cpp" data-lang="cpp"><span style="display:flex;"><span>v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>ObjectTemplate<span style="color:#ff79c6">&gt;</span> result <span style="color:#ff79c6">=</span> v8<span style="color:#ff79c6">::</span>ObjectTemplate<span style="color:#ff79c6">::</span>New(isolate);
+</span></span><span style="display:flex;"><span>result<span style="color:#ff79c6">-&gt;</span>SetNamedPropertyHandler(MapGet, MapSet);
+</span></span></code></pre></div><p>The <code>MapGet</code> interceptor is provided below:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cpp" data-lang="cpp"><span style="display:flex;"><span><span style="color:#8be9fd">void</span> JsHttpRequestProcessor<span style="color:#ff79c6">::</span>MapGet(v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">&gt;</span> name,
+</span></span><span style="display:flex;"><span>                                    <span style="color:#ff79c6">const</span> v8<span style="color:#ff79c6">::</span>PropertyCallbackInfo<span style="color:#ff79c6">&lt;</span>Value<span style="color:#ff79c6">&gt;&amp;</span> info) {
+</span></span><span style="display:flex;"><span>  <span style="color:#6272a4">// Fetch the map wrapped by this object.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>  map<span style="color:#ff79c6">&lt;</span>string, string<span style="color:#ff79c6">&gt;</span> <span style="color:#ff79c6">*</span>obj <span style="color:#ff79c6">=</span> UnwrapMap(info.Holder());
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#6272a4">// Convert the JavaScript string to a std::string.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>  string key <span style="color:#ff79c6">=</span> ObjectToString(name);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#6272a4">// Look up the value if it exists using the standard STL idiom.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>  map<span style="color:#ff79c6">&lt;</span>string, string<span style="color:#ff79c6">&gt;::</span>iterator iter <span style="color:#ff79c6">=</span> obj<span style="color:#ff79c6">-&gt;</span>find(key);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#6272a4">// If the key is not present return an empty handle as signal.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>  <span style="color:#ff79c6">if</span> (iter <span style="color:#ff79c6">==</span> obj<span style="color:#ff79c6">-&gt;</span>end()) <span style="color:#ff79c6">return</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#6272a4">// Otherwise fetch the value and wrap it in a JavaScript string.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>  <span style="color:#ff79c6">const</span> string <span style="color:#ff79c6">&amp;</span>value <span style="color:#ff79c6">=</span> (<span style="color:#ff79c6">*</span>iter).second;
+</span></span><span style="display:flex;"><span>  info.GetReturnValue().Set(v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">::</span>NewFromUtf8(
+</span></span><span style="display:flex;"><span>      value.c_str(), v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">::</span>kNormalString, value.length()));
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>As
+with accessors, the specified callbacks are invoked whenever a property
+is accessed. The difference between accessors and interceptors is that
+interceptors handle all properties, while accessors are associated with
+one specific property.</p>
+<h3 id="security-model">Security model</h3>
+<p>The  “same-origin policy” (first introduced with Netscape Navigator 2.0) prevents a document or script loaded from one “origin” from getting or setting properties of a document from a different “origin”. The term origin is defined here as a combination of domain name (e.g. <code>www.example.com</code>), protocol (e.g. <code>https</code>) and port. For example, <code>www.example.com:81</code> is not the same origin as <code>www.example.com</code>.
+All three must match for two web pages to be considered to have the same origin. Without this protection, a malicious web page could compromise the integrity of another web page.</p>
+<p>In V8 an “origin” is defined as a context. Access to any context other than the one from which you are calling is not allowed by default. To access a context other than the one from which you are calling, you need to use security tokens or security callbacks. A security token can be any value but is typically a symbol, a canonical string that does not exist anywhere else. You can optionally specify a security token with <code>SetSecurityToken</code> when you set up a context. If you do not specify a security token V8 will automatically generate one for the context you are creating.</p>
+<p>When an attempt is made to access a global variable the V8 security system first checks the security token of the global object being accessed against the security token of the code attempting to access the global object. If the tokens match access is granted. If the tokens do not match V8 performs a callback to check if access should be allowed. You can specify whether access to an object should be allowed by setting the security callback on the object, using the <code>SetAccessCheckCallbacks</code> method on object templates. The V8 security system can then fetch the
+security callback of the object being accessed and call it to ask if another context is allowed to access it. This callback is given the object being accessed, the name of the property being accessed, the type of access (read, write, or delete for example) and returns whether or not to allow access.</p>
+<p>This mechanism is implemented in Google Chrome so that if security tokens do not match, a special callback is used to allow access only to the following: <code>window.focus()</code>, <code>window.blur()</code>, <code>window.close()</code>, <code>window.location</code>, <code>window.open()</code>, <code>history.forward()</code>, <code>history.back()</code>, and <code>history.go()</code>.</p>
+<h3 id="exceptions">Exceptions</h3>
+<p>V8 throws an exception if an error occurs — for example, when a script or function attempts to read a property that does not exist, or if a function is called that is not a function. V8 returns an empty
+handle if an operation did not succeed. It is therefore important that your code checks a return value is not an empty handle before continuing execution. Check for an empty handle with the <code>Local</code> class’s public member function <code>IsEmpty()</code>.</p>
+<p>You can catch exceptions with <code>TryCatch</code>, for example:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cpp" data-lang="cpp"><span style="display:flex;"><span>v8<span style="color:#ff79c6">::</span>TryCatch trycatch(isolate);
+</span></span><span style="display:flex;"><span>v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Value<span style="color:#ff79c6">&gt;</span> v <span style="color:#ff79c6">=</span> script<span style="color:#ff79c6">-&gt;</span>Run();
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">if</span> (v.IsEmpty()) {
+</span></span><span style="display:flex;"><span>  v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>Value<span style="color:#ff79c6">&gt;</span> exception <span style="color:#ff79c6">=</span> trycatch.Exception();
+</span></span><span style="display:flex;"><span>  v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">::</span>Utf8Value exception_str(exception);
+</span></span><span style="display:flex;"><span>  printf(<span style="color:#f1fa8c">&#34;Exception: %s</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">&#34;</span>, <span style="color:#ff79c6">*</span>exception_str);
+</span></span><span style="display:flex;"><span>  <span style="color:#6272a4">// ...
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>}
+</span></span></code></pre></div><p>If the value returned is an empty handle, and you do not have a <code>TryCatch</code> in place, your code must bail out. If you do have a <code>TryCatch</code> the exception is caught and your code is allowed to continue processing.</p>
+<h3 id="inheritance">Inheritance</h3>
+<p>JavaScript is a <em>class-free</em>, object-oriented language, and as such, it uses prototypal inheritance
+instead of classical inheritance. This can be puzzling to programmers trained in conventional object-oriented languages like C++ and Java.</p>
+<p>Class-based object-oriented languages, such as Java and C++, are founded on the concept of two distinct entities: classes and instances. JavaScript is a prototype-based language and so does not make this distinction: it simply has objects. JavaScript does not natively support the declaration
+of class hierarchies; however, JavaScript’s prototype mechanism simplifies the process of adding custom properties and methods to all instances of an object. In JavaScript, you can add custom properties to objects. For example:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cpp" data-lang="cpp"><span style="display:flex;"><span><span style="color:#6272a4">// Create an object named `bicycle`.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>function <span style="color:#50fa7b">bicycle</span>() {}
+</span></span><span style="display:flex;"><span><span style="color:#6272a4">// Create an instance of `bicycle` called `roadbike`.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>var roadbike <span style="color:#ff79c6">=</span> <span style="color:#ff79c6">new</span> bicycle();
+</span></span><span style="display:flex;"><span><span style="color:#6272a4">// Define a custom property, `wheels`, on `roadbike`.
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>roadbike.wheels <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">2</span>;
+</span></span></code></pre></div><p>A custom property added this way only exists for that instance of the object. If we create another instance of <code>bicycle()</code>, called <code>mountainbike</code> for example, <code>mountainbike.wheels</code> would return <code>ndefined</code> unless the <code>wheels</code> property is explicitly added.</p>
+<p>Sometimes this is exactly what is required, at other times it would be helpful to add the custom property to all instances of an object - all bicycles have wheels after all. This is where the prototype object of JavaScript is very useful. To use the prototype object, reference the keyword <code>prototype</code> on the object before adding the custom property to it as follows:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-fallback" data-lang="fallback"><span style="display:flex;"><span>// First, create the “bicycle” object
+</span></span><span style="display:flex;"><span>function bicycle() {}
+</span></span><span style="display:flex;"><span>// Assign the wheels property to the object’s prototype
+</span></span><span style="display:flex;"><span>bicycle.prototype.wheels = 2;
+</span></span></code></pre></div><p>All instances of <code>bicycle()</code> will now have the <code>wheels</code> property prebuilt into them.</p>
+<p>The same approach is used in V8 with templates. Each <code>FunctionTemplate</code> has a <code>PrototypeTemplate</code> method which gives a template for the function’s prototype. You can set properties, and associate C++ functions with those properties, on a <code>PrototypeTemplate</code> which will then be present on all instances of the corresponding <code>FunctionTemplate</code>. For example:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cpp" data-lang="cpp"><span style="display:flex;"><span>v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>FunctionTemplate<span style="color:#ff79c6">&gt;</span> biketemplate <span style="color:#ff79c6">=</span> v8<span style="color:#ff79c6">::</span>FunctionTemplate<span style="color:#ff79c6">::</span>New(isolate);
+</span></span><span style="display:flex;"><span>biketemplate<span style="color:#ff79c6">-&gt;</span>PrototypeTemplate().Set(
+</span></span><span style="display:flex;"><span>    v8<span style="color:#ff79c6">::</span>String<span style="color:#ff79c6">::</span>NewFromUtf8(isolate, <span style="color:#f1fa8c">&#34;wheels&#34;</span>),
+</span></span><span style="display:flex;"><span>    v8<span style="color:#ff79c6">::</span>FunctionTemplate<span style="color:#ff79c6">::</span>New(isolate, MyWheelsMethodCallback)<span style="color:#ff79c6">-&gt;</span>GetFunction()
+</span></span><span style="display:flex;"><span>);
+</span></span></code></pre></div><p>This causes all instances of <code>biketemplate</code> to have a <code>wheels</code> method in their prototype chain which, when called, causes the C++ function <code>MyWheelsMethodCallback</code> to be called.</p>
+<p>V8’s <code>FunctionTemplate</code> class provides the public member function <code>Inherit()</code> which you can call when you want a function template to inherit from another function template, as follows:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cpp" data-lang="cpp"><span style="display:flex;"><span><span style="color:#8be9fd">void</span> <span style="color:#50fa7b">Inherit</span>(v8<span style="color:#ff79c6">::</span>Local<span style="color:#ff79c6">&lt;</span>v8<span style="color:#ff79c6">::</span>FunctionTemplate<span style="color:#ff79c6">&gt;</span> parent);
+</span></span></code></pre></div>
+		</section>
+
+		<div class="post-tags">
+			
+			
+			<nav class="nav tags">
+				<ul class="tags">
+					
+					<li><a href="/tags/embedding">embedding</a></li>
+					
+					<li><a href="/tags/v8">v8</a></li>
+					
+					<li><a href="/tags/internals">internals</a></li>
+					
+				</ul>
+			</nav>
+			
+			
+		</div>
+		</article>
+</main>
+<footer>
+  <div style="display:flex"><a class="soc" href="https://github.com/arzedlab/" rel="me" title="GitHub"><i data-feather="github"></i></a>
+    <a class="border"></a><a class="soc" href="https://www.linkedin.com/in/ravshan-rikhsiev/" rel="me" title="Linkedin"><i data-feather="linkedin"></i></a>
+    <a class="border"></a><a class="soc" href="https://twitter.com/arzedlab/" rel="me" title="Twitter"><i data-feather="twitter"></i></a>
+    <a class="border"></a></div>
+  <div class="footer-info">
+    2025  © Ravshan | Made with Love ❤️ <a href="https://twitter.com/arzedlab/"> My Twitter 🪽</a>
+  </div>
+</footer>
+<script>
+  feather.replace()
+</script></div>
+    </body>
+</html>

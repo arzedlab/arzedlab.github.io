@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Unsafe-Unlink on Arzedlab 🪵</title>
+    <link>http://localhost:1313/tags/unsafe-unlink/</link>
+    <description>Recent content in Unsafe-Unlink on Arzedlab 🪵</description>
+    <generator>Hugo</generator>
+    <language>en-us</language>
+    <copyright>© Ravshan</copyright>
+    <lastBuildDate>Tue, 14 Jan 2025 00:00:00 +0000</lastBuildDate>
+    <atom:link href="http://localhost:1313/tags/unsafe-unlink/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Linux Heap Exploitation: Unsafe Unlink</title>
+      <link>http://localhost:1313/posts/unsafe-unlink-1483648c0bf48032a944dc2bc36b5207/</link>
+      <pubDate>Tue, 14 Jan 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/posts/unsafe-unlink-1483648c0bf48032a944dc2bc36b5207/</guid>
+      <description>&lt;h1 id=&#34;unsafe-unlink&#34;&gt;Unsafe Unlink&lt;/h1&gt;&#xA;&lt;h1 id=&#34;introduction&#34;&gt;Introduction&lt;/h1&gt;&#xA;&lt;p&gt;The &amp;ldquo;Unsafe Unlink&amp;rdquo; technique is a heap exploitation attack that was once quite common. It involves manipulating the unlink macro in &lt;code&gt;malloc.c&lt;/code&gt; to remove a chunk from a bin. This attack exploits the pointer manipulation done in the unlink macro, which can lead to arbitrary code execution or other malicious activities.&lt;/p&gt;&#xA;&lt;p&gt;When we free allocated unsorted bin, it will be freed from a doubly linked list.&lt;/p&gt;&#xA;&lt;p&gt;A doubly linked list is a type of data structure that consists of a sequence of elements, where each element (or node) contains three parts:&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>

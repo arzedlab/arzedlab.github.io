@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Malloc on Arzedlab 🪵</title>
+    <link>http://localhost:1313/tags/malloc/</link>
+    <description>Recent content in Malloc on Arzedlab 🪵</description>
+    <generator>Hugo</generator>
+    <language>en-us</language>
+    <copyright>© Ravshan</copyright>
+    <lastBuildDate>Tue, 14 Jan 2025 00:00:00 +0000</lastBuildDate>
+    <atom:link href="http://localhost:1313/tags/malloc/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Linux Heap Exploitation internals</title>
+      <link>http://localhost:1313/posts/linux-heap-exploitation-internals-17a3648c0bf480eda8dcc5f521e1351b/</link>
+      <pubDate>Tue, 14 Jan 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/posts/linux-heap-exploitation-internals-17a3648c0bf480eda8dcc5f521e1351b/</guid>
+      <description>&lt;h2 id=&#34;lifo-and-fifo&#34;&gt;LIFO AND FIFO&lt;/h2&gt;&#xA;&lt;p&gt;&lt;img src=&#34;image.png&#34; alt=&#34;image.png&#34;&gt;&lt;/p&gt;&#xA;&lt;p&gt;LIFO (Last-In, First-Out) and FIFO (First-In, First-Out) are two fundamental methods for managing data structures, each with distinct characteristics and applications.&lt;/p&gt;&#xA;&lt;p&gt;&lt;strong&gt;LIFO (Last-In, First-Out):&lt;/strong&gt;&lt;/p&gt;&#xA;&lt;ul&gt;&#xA;&lt;li&gt;&lt;strong&gt;Structure:&lt;/strong&gt; Commonly implemented using a stack, where the most recently added item is the first to be removed.&lt;/li&gt;&#xA;&lt;li&gt;&lt;strong&gt;Analogy:&lt;/strong&gt; Think of a stack of plates; you add and remove plates from the top.&lt;/li&gt;&#xA;&lt;li&gt;&lt;strong&gt;Applications:&lt;/strong&gt;&#xA;&lt;ul&gt;&#xA;&lt;li&gt;&lt;strong&gt;Memory Management:&lt;/strong&gt; Utilized in function call management and recursive processes, where the last called function is the first to return.&lt;/li&gt;&#xA;&lt;li&gt;&lt;strong&gt;Undo Functionality:&lt;/strong&gt; In applications like text editors, the last action performed is the first to be undone.&lt;/li&gt;&#xA;&lt;li&gt;&lt;strong&gt;Browser History:&lt;/strong&gt; The most recently visited page is the first to be revisited when navigating backward.&lt;/li&gt;&#xA;&lt;/ul&gt;&#xA;&lt;/li&gt;&#xA;&lt;/ul&gt;&#xA;&lt;p&gt;&lt;strong&gt;FIFO (First-In, First-Out):&lt;/strong&gt;&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>Linux Heap Exploitation: Unsafe Unlink</title>
+      <link>http://localhost:1313/posts/unsafe-unlink-1483648c0bf48032a944dc2bc36b5207/</link>
+      <pubDate>Tue, 14 Jan 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/posts/unsafe-unlink-1483648c0bf48032a944dc2bc36b5207/</guid>
+      <description>&lt;h1 id=&#34;unsafe-unlink&#34;&gt;Unsafe Unlink&lt;/h1&gt;&#xA;&lt;h1 id=&#34;introduction&#34;&gt;Introduction&lt;/h1&gt;&#xA;&lt;p&gt;The &amp;ldquo;Unsafe Unlink&amp;rdquo; technique is a heap exploitation attack that was once quite common. It involves manipulating the unlink macro in &lt;code&gt;malloc.c&lt;/code&gt; to remove a chunk from a bin. This attack exploits the pointer manipulation done in the unlink macro, which can lead to arbitrary code execution or other malicious activities.&lt;/p&gt;&#xA;&lt;p&gt;When we free allocated unsorted bin, it will be freed from a doubly linked list.&lt;/p&gt;&#xA;&lt;p&gt;A doubly linked list is a type of data structure that consists of a sequence of elements, where each element (or node) contains three parts:&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>

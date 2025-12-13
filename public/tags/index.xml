@@ -7,27 +7,188 @@
     <generator>Hugo</generator>
     <language>en-us</language>
     <copyright>© Ravshan</copyright>
-    <lastBuildDate>Tue, 12 Nov 2024 15:45:36 +0500</lastBuildDate>
+    <lastBuildDate>Mon, 24 Nov 2025 00:00:00 +0000</lastBuildDate>
     <atom:link href="http://localhost:1313/tags/index.xml" rel="self" type="application/rss+xml" />
     <item>
-      <title>Chain</title>
-      <link>http://localhost:1313/tags/chain/</link>
-      <pubDate>Tue, 12 Nov 2024 15:45:36 +0500</pubDate>
-      <guid>http://localhost:1313/tags/chain/</guid>
+      <title>Ghidra</title>
+      <link>http://localhost:1313/tags/ghidra/</link>
+      <pubDate>Mon, 24 Nov 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/ghidra/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Qemu</title>
+      <link>http://localhost:1313/tags/qemu/</link>
+      <pubDate>Mon, 24 Nov 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/qemu/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Reverse</title>
+      <link>http://localhost:1313/tags/reverse/</link>
+      <pubDate>Mon, 24 Nov 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/reverse/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Routers</title>
+      <link>http://localhost:1313/tags/routers/</link>
+      <pubDate>Mon, 24 Nov 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/routers/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Simulation</title>
+      <link>http://localhost:1313/tags/simulation/</link>
+      <pubDate>Mon, 24 Nov 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/simulation/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>SPI Dump</title>
+      <link>http://localhost:1313/tags/spi-dump/</link>
+      <pubDate>Mon, 24 Nov 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/spi-dump/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>UART</title>
+      <link>http://localhost:1313/tags/uart/</link>
+      <pubDate>Mon, 24 Nov 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/uart/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Heap</title>
+      <link>http://localhost:1313/tags/heap/</link>
+      <pubDate>Fri, 22 Aug 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/heap/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Integer Overflow</title>
+      <link>http://localhost:1313/tags/integer-overflow/</link>
+      <pubDate>Fri, 22 Aug 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/integer-overflow/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Libxml2</title>
+      <link>http://localhost:1313/tags/libxml2/</link>
+      <pubDate>Fri, 22 Aug 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/libxml2/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>OOB</title>
+      <link>http://localhost:1313/tags/oob/</link>
+      <pubDate>Fri, 22 Aug 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/oob/</guid>
       <description></description>
     </item>
     <item>
       <title>Exploitation</title>
       <link>http://localhost:1313/tags/exploitation/</link>
-      <pubDate>Tue, 12 Nov 2024 15:45:36 +0500</pubDate>
+      <pubDate>Thu, 05 Jun 2025 00:00:00 +0000</pubDate>
       <guid>http://localhost:1313/tags/exploitation/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Kernel</title>
+      <link>http://localhost:1313/tags/kernel/</link>
+      <pubDate>Thu, 05 Jun 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/kernel/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Linux</title>
+      <link>http://localhost:1313/tags/linux/</link>
+      <pubDate>Thu, 05 Jun 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/linux/</guid>
       <description></description>
     </item>
     <item>
       <title>ROP</title>
       <link>http://localhost:1313/tags/rop/</link>
-      <pubDate>Tue, 12 Nov 2024 15:45:36 +0500</pubDate>
+      <pubDate>Thu, 05 Jun 2025 00:00:00 +0000</pubDate>
       <guid>http://localhost:1313/tags/rop/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>SMEP</title>
+      <link>http://localhost:1313/tags/smep/</link>
+      <pubDate>Thu, 05 Jun 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/smep/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>CVE-2020-28025</title>
+      <link>http://localhost:1313/tags/cve-2020-28025/</link>
+      <pubDate>Mon, 26 May 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/cve-2020-28025/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Exim</title>
+      <link>http://localhost:1313/tags/exim/</link>
+      <pubDate>Mon, 26 May 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/exim/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Android</title>
+      <link>http://localhost:1313/tags/android/</link>
+      <pubDate>Fri, 17 Jan 2025 11:13:32 +0500</pubDate>
+      <guid>http://localhost:1313/tags/android/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Apk</title>
+      <link>http://localhost:1313/tags/apk/</link>
+      <pubDate>Fri, 17 Jan 2025 11:13:32 +0500</pubDate>
+      <guid>http://localhost:1313/tags/apk/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Frida</title>
+      <link>http://localhost:1313/tags/frida/</link>
+      <pubDate>Fri, 17 Jan 2025 11:13:32 +0500</pubDate>
+      <guid>http://localhost:1313/tags/frida/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Ssl-Pinning</title>
+      <link>http://localhost:1313/tags/ssl-pinning/</link>
+      <pubDate>Fri, 17 Jan 2025 11:13:32 +0500</pubDate>
+      <guid>http://localhost:1313/tags/ssl-pinning/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Glibc</title>
+      <link>http://localhost:1313/tags/glibc/</link>
+      <pubDate>Tue, 14 Jan 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/glibc/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Malloc</title>
+      <link>http://localhost:1313/tags/malloc/</link>
+      <pubDate>Tue, 14 Jan 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/malloc/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Unsafe-Unlink</title>
+      <link>http://localhost:1313/tags/unsafe-unlink/</link>
+      <pubDate>Tue, 14 Jan 2025 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/unsafe-unlink/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Chain</title>
+      <link>http://localhost:1313/tags/chain/</link>
+      <pubDate>Tue, 12 Nov 2024 15:45:36 +0500</pubDate>
+      <guid>http://localhost:1313/tags/chain/</guid>
       <description></description>
     </item>
     <item>
@@ -42,6 +203,160 @@
       <link>http://localhost:1313/tags/writeup/</link>
       <pubDate>Tue, 12 Nov 2024 15:45:36 +0500</pubDate>
       <guid>http://localhost:1313/tags/writeup/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Chameleon</title>
+      <link>http://localhost:1313/tags/chameleon/</link>
+      <pubDate>Thu, 20 Jun 2024 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/chameleon/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Golang</title>
+      <link>http://localhost:1313/tags/golang/</link>
+      <pubDate>Thu, 20 Jun 2024 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/golang/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Honeypot</title>
+      <link>http://localhost:1313/tags/honeypot/</link>
+      <pubDate>Thu, 20 Jun 2024 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/honeypot/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Ssh</title>
+      <link>http://localhost:1313/tags/ssh/</link>
+      <pubDate>Thu, 20 Jun 2024 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/ssh/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Assimp</title>
+      <link>http://localhost:1313/tags/assimp/</link>
+      <pubDate>Fri, 05 Apr 2024 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/assimp/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Heap-Overflow</title>
+      <link>http://localhost:1313/tags/heap-overflow/</link>
+      <pubDate>Fri, 05 Apr 2024 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/heap-overflow/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Memory</title>
+      <link>http://localhost:1313/tags/memory/</link>
+      <pubDate>Fri, 05 Apr 2024 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/memory/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Compiler</title>
+      <link>http://localhost:1313/tags/compiler/</link>
+      <pubDate>Sat, 30 Mar 2024 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/compiler/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>CVE-2021-38003</title>
+      <link>http://localhost:1313/tags/cve-2021-38003/</link>
+      <pubDate>Sat, 30 Mar 2024 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/cve-2021-38003/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Hole-Leak</title>
+      <link>http://localhost:1313/tags/hole-leak/</link>
+      <pubDate>Sat, 30 Mar 2024 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/hole-leak/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Javascript</title>
+      <link>http://localhost:1313/tags/javascript/</link>
+      <pubDate>Sat, 30 Mar 2024 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/javascript/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Turbofan</title>
+      <link>http://localhost:1313/tags/turbofan/</link>
+      <pubDate>Sat, 30 Mar 2024 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/turbofan/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>V8</title>
+      <link>http://localhost:1313/tags/v8/</link>
+      <pubDate>Sat, 30 Mar 2024 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/v8/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>CVE-2020-6418</title>
+      <link>http://localhost:1313/tags/cve-2020-6418/</link>
+      <pubDate>Fri, 02 Feb 2024 13:13:13 +0500</pubDate>
+      <guid>http://localhost:1313/tags/cve-2020-6418/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Type Confusion</title>
+      <link>http://localhost:1313/tags/type-confusion/</link>
+      <pubDate>Fri, 02 Feb 2024 13:13:13 +0500</pubDate>
+      <guid>http://localhost:1313/tags/type-confusion/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>CVE-2019-5782</title>
+      <link>http://localhost:1313/tags/cve-2019-5782/</link>
+      <pubDate>Fri, 01 Dec 2023 13:13:13 +0500</pubDate>
+      <guid>http://localhost:1313/tags/cve-2019-5782/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Internals</title>
+      <link>http://localhost:1313/tags/internals/</link>
+      <pubDate>Sat, 05 Aug 2023 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/internals/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Tree</title>
+      <link>http://localhost:1313/tags/tree/</link>
+      <pubDate>Sat, 05 Aug 2023 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/tree/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Embedding</title>
+      <link>http://localhost:1313/tags/embedding/</link>
+      <pubDate>Thu, 06 Jul 2023 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/embedding/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>CVE-2021-36414</title>
+      <link>http://localhost:1313/tags/cve-2021-36414/</link>
+      <pubDate>Tue, 04 Apr 2023 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/cve-2021-36414/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Heap-Buffer-Overflow</title>
+      <link>http://localhost:1313/tags/heap-buffer-overflow/</link>
+      <pubDate>Tue, 04 Apr 2023 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/heap-buffer-overflow/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>MP4Box</title>
+      <link>http://localhost:1313/tags/mp4box/</link>
+      <pubDate>Tue, 04 Apr 2023 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/tags/mp4box/</guid>
       <description></description>
     </item>
   </channel>

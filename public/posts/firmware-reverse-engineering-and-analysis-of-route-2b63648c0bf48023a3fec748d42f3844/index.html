@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>Firmware reverse engineering and analysis of router devices - Arzedlab 🪵</title><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="This post explains the firmware extraction and analysis process for consumer-grade routers, focusing on filesystem inspection, ELF analysis, and configuration recovery. It highlights semulation of embedded systems, including libraries, binaries, and services." />
+	<meta property="og:image" content=""/>
+	<meta property="og:url" content="http://localhost:1313/posts/firmware-reverse-engineering-and-analysis-of-route-2b63648c0bf48023a3fec748d42f3844/">
+  <meta property="og:site_name" content="Arzedlab 🪵">
+  <meta property="og:title" content="Firmware reverse engineering and analysis of router devices">
+  <meta property="og:description" content="This post explains the firmware extraction and analysis process for consumer-grade routers, focusing on filesystem inspection, ELF analysis, and configuration recovery. It highlights semulation of embedded systems, including libraries, binaries, and services.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2025-11-24T00:00:00+00:00">
+    <meta property="article:modified_time" content="2025-11-24T00:00:00+00:00">
+    <meta property="article:tag" content="Routers">
+    <meta property="article:tag" content="Qemu">
+    <meta property="article:tag" content="Simulation">
+    <meta property="article:tag" content="Ghidra">
+    <meta property="article:tag" content="Reverse">
+    <meta property="article:tag" content="UART">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Firmware reverse engineering and analysis of router devices">
+  <meta name="twitter:description" content="This post explains the firmware extraction and analysis process for consumer-grade routers, focusing on filesystem inspection, ELF analysis, and configuration recovery. It highlights semulation of embedded systems, including libraries, binaries, and services.">
+<script src="http://localhost:1313/js/feather.min.js"></script>
+	
+	
+        <link href="http://localhost:1313/css/fonts.2c2227b81b1970a03e760aa2e6121cd01f87c88586803cbb282aa224720a765f.css" rel="stylesheet">
+	
+
+	
+	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:1313/css/main.7198d56e4fe53ab4610aa7f913b8d3fa7453003ac7791c64a6d6157aecbbced5.css" />
+
+	
+	
+
+	
+	
+
+	
+</head>
+<body>
+        <div class="content"><header>
+	<div class="main">
+		<a href="http://localhost:1313/">Arzedlab 🪵</a>
+	</div>
+	<nav>
+		
+		<a href="/">🏠 Home</a>
+		
+		<a href="/posts">🗂️ All posts</a>
+		
+		<a href="/about">💡 About Me</a>
+		
+		<a href="/papers">📑 Publications</a>
+		
+		<a href="/tags">🏷️ Tags</a>
+		
+		
+	</nav>
+</header>
+
+<main>
+	<article>
+		<div class="title">
+			<h1 class="title">Firmware reverse engineering and analysis of router devices</h1>
+			<div class="meta">Posted on Nov 24, 2025</div>
+		</div>
+		
+
+		
+		<div class="toc">
+		<strong>Table of contents:</strong>
+		<nav id="TableOfContents">
+  <ul>
+    <li><a href="#intro">Intro</a></li>
+    <li><a href="#what-is-the-overall-router">What is the overall router?</a></li>
+    <li><a href="#bootloader-kernel-and-root-filesystem">Bootloader, Kernel, and Root Filesystem</a>
+      <ul>
+        <li><a href="#1-bootloader"><strong>1. Bootloader</strong></a></li>
+        <li><a href="#2-kernel"><strong>2. Kernel</strong></a></li>
+        <li><a href="#3-root-filesystem-rootfs"><strong>3. Root Filesystem (RootFS)</strong></a></li>
+      </ul>
+    </li>
+    <li><a href="#ways-of-extracting-firmware-from-a-router"><strong>Ways of Extracting Firmware From a Router</strong></a>
+      <ul>
+        <li><a href="#1-downloading-directly-from-the-official-website-the-firmware">1. Downloading directly from the official website the firmware.</a></li>
+        <li><a href="#2-intercept-the-firmware-in-the-process-of-updating">2. Intercept the firmware in the process of updating.</a></li>
+        <li><a href="#3-jtag-access-hardware-level-firmware-extraction">3. <strong>JTAG Access (Hardware-Level Firmware Extraction)</strong></a></li>
+        <li><a href="#31-hardware-required"><strong>3.1. Hardware Required</strong></a></li>
+        <li><a href="#32-detecting-jtag-pins"><strong>3.2. Detecting JTAG Pins</strong></a></li>
+        <li><a href="#33-connecting-via-openocd"><strong>3.3. Connecting via OpenOCD</strong></a></li>
+        <li><a href="#34-dumping-flash-via-jtag"><strong>3.4 Dumping Flash via JTAG</strong></a></li>
+        <li><a href="#4-spi-flash-chip-dumping-hardware-level"><strong>4. SPI Flash Chip Dumping (Hardware-Level)</strong></a></li>
+        <li><a href="#41-tools"><strong>4.1. Tools</strong></a></li>
+        <li><a href="#42-identify-flash-chip"><strong>4.2. Identify Flash Chip</strong></a></li>
+        <li><a href="#43-dumping-flash-in-circuit-with-soic-clip"><strong>4.3. Dumping Flash In-Circuit with SOIC Clip</strong></a></li>
+        <li><a href="#44-dumping-individual-flash-regions"><strong>4.4. Dumping Individual Flash Regions</strong></a></li>
+        <li><a href="#5-uart--serial-console-dump-bootloader-level"><strong>5. UART / Serial Console Dump (Bootloader-Level)</strong></a></li>
+        <li><a href="#51-connection"><strong>5.1. Connection</strong></a></li>
+        <li><a href="#52-dump-flash-using-u-boot-commands"><strong>5.2. Dump Flash Using U-Boot Commands</strong></a></li>
+        <li><a href="#dumping-flash-to-ram"><strong>Dumping Flash to RAM</strong></a></li>
+        <li><a href="#transfer-dump-to-host-via-tftp"><strong>Transfer Dump to Host via TFTP</strong></a></li>
+        <li><a href="#dump-flash-page-by-page"><strong>Dump Flash Page-by-Page</strong></a></li>
+        <li><a href="#53-dump-mtd-partitions-via-linux-shell"><strong>5.3. Dump MTD Partitions via Linux Shell</strong></a></li>
+      </ul>
+    </li>
+    <li><a href="#root-filesystem-inspection">Root Filesystem Inspection</a></li>
+    <li><a href="#emulating-firmware-with-qemu">Emulating Firmware with QEMU</a>
+      <ul>
+        <li><a href="#what-is-qemu"><strong>What Is QEMU?</strong></a></li>
+      </ul>
+    </li>
+    <li><a href="#how-to-identify-kernel-version-and-architecture">How to identify kernel version and architecture?</a></li>
+    <li><a href="#directly-emulating-separate-parts-of-firmware">Directly emulating separate parts of firmware</a>
+      <ul>
+        <li><a href="#ways-to-move-files-from-the-host-to-the-vm">Ways to move files from the Host to the VM.</a></li>
+        <li><a href="#port-forwarded-ssh">Port-forwarded SSH</a></li>
+        <li><a href="#using-9p-filesystem-shared-folder">Using 9p Filesystem (Shared Folder)</a></li>
+        <li><a href="#attach-firmware-as-second-disk">Attach Firmware as Second Disk</a></li>
+      </ul>
+    </li>
+    <li><a href="#preparing-the-environment-for-emulation">Preparing the environment for emulation</a></li>
+  </ul>
+
+  <ul>
+    <li>
+      <ul>
+        <li><a href="#arm-x"><strong>ARM-X</strong></a></li>
+      </ul>
+    </li>
+  </ul>
+
+  <ul>
+    <li><a href="#quick-setup">Quick Setup</a></li>
+    <li><a href="#database-configuration">Database Configuration</a></li>
+    <li><a href="#download-pre-built-kernels">Download Pre-built Kernels</a></li>
+    <li><a href="#extract-and-emulate-firmware">Extract and Emulate Firmware</a></li>
+    <li><a href="#understanding-the-scratch-directory">Understanding the Scratch Directory</a></li>
+    <li><a href="#accessing-the-emulated-router">Accessing the Emulated Router</a></li>
+    <li><a href="#alternative-if-fails-using-firmae">Alternative if fails: Using FirmAE</a></li>
+    <li><a href="#troubleshooting">Troubleshooting</a></li>
+    <li><a href="#complete-workflow-example">Complete Workflow Example</a></li>
+  </ul>
+</nav>
+		</div>
+
+		<section class="body">
+			<h1 id="firmware-reverse-engineering-and-analysis-of-router-devices">Firmware reverse engineering and analysis of router devices</h1>
+<h2 id="intro">Intro</h2>
+<p>First of all, hello everyone. We&rsquo;re here to discuss routers, which are essential devices in our lives.  Probably, more people don’t even know what it is. I have always been interested in security. How secure are they? In this post, I will discuss the feasibility of extracting the firmware and attempting to reverse it. Believe me, it is more interesting. In the market, there are routers from high-profile enterprises like Fortinet to budget home brands like TP-Link and Tenda, as well as other Chinese brands.</p>
+<h2 id="what-is-the-overall-router">What is the overall router?</h2>
+<p>A <em>router</em> is a complete device that directs network traffic between networks, most commonly between your home network and the internet. It combines several essential functions into one physical unit: routing data packets, providing wired and wireless connectivity, managing network security, and assigning IP addresses to devices. In everyday use, the router acts as the central hub, keeping all your devices connected and ensuring that information is sent to the right place efficiently and securely.</p>
+<h2 id="bootloader-kernel-and-root-filesystem">Bootloader, Kernel, and Root Filesystem</h2>
+<p>Router firmware is usually built from three fundamental components that work together to boot the device and provide all network functionality. Understanding these layers is essential for analyzing or reverse-engineering any embedded system.</p>
+<h3 id="1-bootloader"><strong>1. Bootloader</strong></h3>
+<p>The bootloader is the first piece of code to run when the router powers on. In most consumer routers, this is <strong>U-Boot</strong>, a lightweight and highly configurable embedded boot manager. Its responsibilities include:</p>
+<ul>
+<li>Initializing the CPU, RAM, flash, and essential peripherals</li>
+<li>Loading the Linux kernel from flash storage</li>
+<li>Providing a recovery or failsafe console over the UART</li>
+<li>Verifying firmware integrity, sometimes with signatures</li>
+<li>Exposing environment variables that control boot parameters</li>
+</ul>
+<p>The bootloader <em>prepares</em> the hardware and hands control over to the operating system.</p>
+<h3 id="2-kernel"><strong>2. Kernel</strong></h3>
+<p>Routers typically run a stripped-down Linux kernel on architectures such as <strong>MIPS</strong>, <strong>ARM</strong>, and <strong>Qualcomm Atheros</strong> SoCs. The kernel includes:</p>
+<ul>
+<li>Drivers for Ethernet switches, Wi-Fi radios, USB, and flash memory</li>
+<li>Filesystem support (SquashFS, JFFS2, UBIFS)</li>
+<li>Networking stacks (iptables, bridge, VLAN, NAT, QoS)</li>
+<li>Device-specific patches applied by manufacturers</li>
+</ul>
+<p>Vendors often customize the kernel with proprietary wireless drivers or SoC-specific code, making kernel extraction and decompilation one of the most critical parts of firmware analysis.</p>
+<h3 id="3-root-filesystem-rootfs"><strong>3. Root Filesystem (RootFS)</strong></h3>
+<p>The root filesystem contains everything the router needs to operate once the kernel starts. It usually includes:</p>
+<ul>
+<li><code>/bin</code>, <code>/sbin</code>, <code>/usr/bin</code>, <code>/usr/sbin</code> - system utilities and command-line tools</li>
+<li>Init scripts that control the boot process</li>
+<li>The web administration interface (HTML, CGI binaries, Lua, PHP, etc.)</li>
+<li>Configuration files such as network settings, firewall rules, and Wi-Fi passwords</li>
+<li>BusyBox - a compact, multi-call binary replacing most core Linux tools</li>
+<li>Vendor daemons for DHCP, DNS, routing, and wireless</li>
+<li>Optional packages (VPN, parental controls, IPv6 services)</li>
+</ul>
+<p>Most routers use <strong>SquashFS</strong> for the root filesystem because it is highly compressed and read-only. Writable data is stored separately in JFFS2 or overlay partitions.</p>
+<h2 id="ways-of-extracting-firmware-from-a-router"><strong>Ways of Extracting Firmware From a Router</strong></h2>
+<p>Extracting firmware from a router is often the first step in reverse engineering or vulnerability research. Depending on the device and level of protection, there are several practical methods ranging from simple downloads to hardware-level extraction.</p>
+<p>Note: if you don’t have a toolkit to extract firmware from the hardware. No worries, in our test case, we use the vendor-provided firmware from the vendor&rsquo;s website.</p>
+<h3 id="1-downloading-directly-from-the-official-website-the-firmware">1. Downloading directly from the official website the firmware.</h3>
+<h3 id="2-intercept-the-firmware-in-the-process-of-updating">2. Intercept the firmware in the process of updating.</h3>
+<h3 id="3-jtag-access-hardware-level-firmware-extraction">3. <strong>JTAG Access (Hardware-Level Firmware Extraction)</strong></h3>
+<p>JTAG (Joint Test Action Group) allows low-level interaction with the CPU for debugging, halting execution, and reading memory/flash. Many routers expose a 10-pin or 14-pin JTAG header.</p>
+<h3 id="31-hardware-required"><strong>3.1. Hardware Required</strong></h3>
+<ul>
+<li>JTAG adapter (Bus Pirate, JTAGulator, FT2232H, Segger J-Link, OpenOCD-supported device)</li>
+<li>Soldered header pins on router PCB</li>
+<li>OpenOCD is installed on your host system</li>
+</ul>
+<h3 id="32-detecting-jtag-pins"><strong>3.2. Detecting JTAG Pins</strong></h3>
+<p>If pins aren’t labeled:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#6272a4"># Using JTAGulator to auto-detect TCK, TMS, TDI, TDO</span>
+</span></span><span style="display:flex;"><span>jtagulator detectJTAG
+</span></span></code></pre></div><p>You connect the probe to multiple pins; JTAGulator determines:</p>
+<ul>
+<li>TCK (Test Clock)</li>
+<li>TMS (Mode Select)</li>
+<li>TDI (Data In)</li>
+<li>TDO (Data Out)</li>
+</ul>
+<h3 id="33-connecting-via-openocd"><strong>3.3. Connecting via OpenOCD</strong></h3>
+<p>Example OpenOCD interface configuration for Bus Pirate:</p>
+<p><code>interface.cfg</code>:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-fallback" data-lang="fallback"><span style="display:flex;"><span>interface buspirate
+</span></span><span style="display:flex;"><span>buspirate_port /dev/ttyUSB0
+</span></span><span style="display:flex;"><span>buspirate_speed 115200
+</span></span></code></pre></div><p>Target config (<code>target.cfg</code>):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-fallback" data-lang="fallback"><span style="display:flex;"><span>source [find target/mips_m4k.cfg]
+</span></span><span style="display:flex;"><span>reset_config trst_and_srst
+</span></span></code></pre></div><p>Run:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>sudo openocd -f interface.cfg -f target.cfg
+</span></span></code></pre></div><h3 id="34-dumping-flash-via-jtag"><strong>3.4 Dumping Flash via JTAG</strong></h3>
+<p>Inside the OpenOCD telnet console:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>telnet localhost <span style="color:#bd93f9">4444</span>
+</span></span></code></pre></div><p>Then dump memory:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#6272a4"># Halt CPU</span>
+</span></span><span style="display:flex;"><span>halt
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4"># Dump SPI flash-mapped memory (example address 0x1FC00000)</span>
+</span></span><span style="display:flex;"><span>dump_image router_flash.bin 0x1FC00000 0x01000000
+</span></span></code></pre></div><p>Where:</p>
+<ul>
+<li><strong>0x1FC00000</strong> = typical flash base address for MIPS SoCs</li>
+<li><strong>0x01000000</strong> = 16 MB size (adjust per router)</li>
+</ul>
+<p>Store result:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-gdscript3" data-lang="gdscript3"><span style="display:flex;"><span>dump_image bootloader<span style="color:#ff79c6">.</span>bin <span style="color:#bd93f9">0x1FC00000</span> <span style="color:#bd93f9">0x00040000</span>
+</span></span></code></pre></div><p>You can now analyze the raw flash image.</p>
+<hr>
+<h3 id="4-spi-flash-chip-dumping-hardware-level"><strong>4. SPI Flash Chip Dumping (Hardware-Level)</strong></h3>
+<p>This uses a <strong>flash programmer</strong> to directly read/write the SPI NOR flash chip storing the firmware.</p>
+<h3 id="41-tools"><strong>4.1. Tools</strong></h3>
+<ul>
+<li>CH341A USB SPI programmer</li>
+<li>SOIC8 clip (for in-circuit)</li>
+<li><code>flashrom</code> utility</li>
+</ul>
+<h3 id="42-identify-flash-chip"><strong>4.2. Identify Flash Chip</strong></h3>
+<p>Router PCB will have something like:</p>
+<ul>
+<li>Winbond <strong>W25Q64FV</strong></li>
+<li>Macronix <strong>MX25L128</strong></li>
+<li>GD25Q64</li>
+</ul>
+<h3 id="43-dumping-flash-in-circuit-with-soic-clip"><strong>4.3. Dumping Flash In-Circuit with SOIC Clip</strong></h3>
+<p>Attach the SOIC clip to the chip <em>with the router powered off</em>.</p>
+<p>Connect clip → CH341A → USB.</p>
+<p>Run:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>sudo flashrom -p ch341a_spi -r full_dump.bin
+</span></span></code></pre></div><p>Verify:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>sudo flashrom -p ch341a_spi -v full_dump.bin
+</span></span></code></pre></div><p>If in-circuit access fails (due to voltage interference):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-fallback" data-lang="fallback"><span style="display:flex;"><span>sudo flashrom -p ch341a_spi --noverify-all -r dump_partial.bin
+</span></span></code></pre></div><p>If still bad: <strong>desolder the chip</strong> and read directly:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>sudo flashrom -p ch341a_spi -r router_flash_raw.bin
+</span></span></code></pre></div><h3 id="44-dumping-individual-flash-regions"><strong>4.4. Dumping Individual Flash Regions</strong></h3>
+<p>After identifying partitions via binwalk:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>binwalk -e firmware.bin
+</span></span></code></pre></div><p>You might split manually:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>dd <span style="color:#ff79c6">if</span><span style="color:#ff79c6">=</span>full_dump.bin <span style="color:#8be9fd;font-style:italic">of</span><span style="color:#ff79c6">=</span>u-boot.bin <span style="color:#8be9fd;font-style:italic">bs</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">1</span> <span style="color:#8be9fd;font-style:italic">count</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">262144</span>
+</span></span><span style="display:flex;"><span>dd <span style="color:#ff79c6">if</span><span style="color:#ff79c6">=</span>full_dump.bin <span style="color:#8be9fd;font-style:italic">of</span><span style="color:#ff79c6">=</span>kernel.bin <span style="color:#8be9fd;font-style:italic">bs</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">1</span> <span style="color:#8be9fd;font-style:italic">skip</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">262144</span> <span style="color:#8be9fd;font-style:italic">count</span><span style="color:#ff79c6">=</span><span style="color:#bd93f9">2097152</span>
+</span></span></code></pre></div><hr>
+<h3 id="5-uart--serial-console-dump-bootloader-level"><strong>5. UART / Serial Console Dump (Bootloader-Level)</strong></h3>
+<p><img src="image.png" alt="image.png"></p>
+<p>UART provides access to the bootloader (e.g., U-Boot, RedBoot, CFE). Most routers expose UART pads: <strong>GND, TX, RX,</strong> (Sometimes VCC – but DO NOT connect VCC).</p>
+<h3 id="51-connection"><strong>5.1. Connection</strong></h3>
+<p><img src="image%201.png" alt="image.png"></p>
+<p>You should connect GND to GND, but Tx and Rx to the opposite pins.</p>
+<p>Use:</p>
+<ul>
+<li>USB–TTL adapter (FT232RL, CH340, CP2102)</li>
+</ul>
+<p><img src="image%202.png" alt="image.png"></p>
+<ul>
+<li>115200 baud (most common)</li>
+</ul>
+<p>Example:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>screen /dev/ttyUSB0 <span style="color:#bd93f9">115200</span>
+</span></span></code></pre></div><p>Or:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>picocom /dev/ttyUSB0 -b <span style="color:#bd93f9">115200</span>
+</span></span></code></pre></div><p>Baud depends on the hardware; it may differ.</p>
+<p>Press <strong>Ctrl+C</strong> or any key during boot to stop autoboot.</p>
+<p>You’ll see something like:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-fallback" data-lang="fallback"><span style="display:flex;"><span>U-Boot 1.1.4 (Jan 1 2010)
+</span></span><span style="display:flex;"><span>ar7240&gt;
+</span></span></code></pre></div><h3 id="52-dump-flash-using-u-boot-commands"><strong>5.2. Dump Flash Using U-Boot Commands</strong></h3>
+<h3 id="dumping-flash-to-ram"><strong>Dumping Flash to RAM</strong></h3>
+<p>Example reading 4MB from flash:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-fallback" data-lang="fallback"><span style="display:flex;"><span>ar7240&gt; nand read 0x81000000 0x000000 0x400000
+</span></span></code></pre></div><p><code>0x81000000</code> = RAM buffer, <code>0x000000</code> = flash offset, <code>0x400000</code> = size (4MB).</p>
+<h3 id="transfer-dump-to-host-via-tftp"><strong>Transfer Dump to Host via TFTP</strong></h3>
+<p>Set up a TFTP server on your PC, then:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-fallback" data-lang="fallback"><span style="display:flex;"><span>ar7240&gt; setenv ipaddr 192.168.1.1
+</span></span><span style="display:flex;"><span>ar7240&gt; setenv serverip 192.168.1.2
+</span></span><span style="display:flex;"><span>ar7240&gt; tftp put 0x81000000 0x400000 flash_dump.bin
+</span></span></code></pre></div><h3 id="dump-flash-page-by-page"><strong>Dump Flash Page-by-Page</strong></h3>
+<p>Some bootloaders lack full <code>nand</code> read, so you use a loop:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-fallback" data-lang="fallback"><span style="display:flex;"><span>ar7240&gt; md.b 0x1f000000 0x10000
+</span></span></code></pre></div><h3 id="53-dump-mtd-partitions-via-linux-shell"><strong>5.3. Dump MTD Partitions via Linux Shell</strong></h3>
+<p>If the router boots fully and offers a shell:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>cat /proc/mtd
+</span></span></code></pre></div><p>Example output:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-fallback" data-lang="fallback"><span style="display:flex;"><span>mtd0: 00040000 00010000 &#34;u-boot&#34;
+</span></span><span style="display:flex;"><span>mtd1: 00200000 00010000 &#34;kernel&#34;
+</span></span><span style="display:flex;"><span>mtd2: 003c0000 00010000 &#34;rootfs&#34;
+</span></span></code></pre></div><p>Dump partitions:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>dd <span style="color:#ff79c6">if</span><span style="color:#ff79c6">=</span>/dev/mtd0 <span style="color:#8be9fd;font-style:italic">of</span><span style="color:#ff79c6">=</span>u-boot.bin
+</span></span><span style="display:flex;"><span>dd <span style="color:#ff79c6">if</span><span style="color:#ff79c6">=</span>/dev/mtd1 <span style="color:#8be9fd;font-style:italic">of</span><span style="color:#ff79c6">=</span>kernel.bin
+</span></span><span style="display:flex;"><span>dd <span style="color:#ff79c6">if</span><span style="color:#ff79c6">=</span>/dev/mtd2 <span style="color:#8be9fd;font-style:italic">of</span><span style="color:#ff79c6">=</span>rootfs.bin
+</span></span></code></pre></div><p>Or all at once:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>dd <span style="color:#ff79c6">if</span><span style="color:#ff79c6">=</span>/dev/mtdblock0 <span style="color:#8be9fd;font-style:italic">of</span><span style="color:#ff79c6">=</span>flash_complete.bin
+</span></span></code></pre></div><hr>
+<h2 id="root-filesystem-inspection">Root Filesystem Inspection</h2>
+<p>If you downloaded from the official website of the vendor, it is easy to extract it with the command  <code>binwalk -e firmware.bin</code> , we take as an example of <code>TP-Link WR841N V14 250328 US</code> firmware to clearly show how it indeed works.</p>
+<p>After unzipping and recursive extraction into firmware.bin.extracted, we see multiple files of kernel</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>ls
+</span></span><span style="display:flex;"><span><span style="color:#bd93f9">100200.</span>squashfs  <span style="color:#bd93f9">10400</span>  <span style="color:#bd93f9">10400.7</span>z  squashfs<span style="color:#ff79c6">-</span>root  squashfs<span style="color:#ff79c6">-</span>root<span style="color:#ff79c6">-</span><span style="color:#bd93f9">0</span>
+</span></span></code></pre></div><p>This is the extracted root filesystem from the <code>SquashFS</code> image. The unsquashfs tool creates this directory by default. It contains the actual Linux root filesystem tree:
+<code>/bin</code>, <code>/sbin</code>, <code>/etc</code>,<code>/www</code>, <code>/usr</code>, etc.
+This is the part you analyze to inspect scripts, web interface code, binaries, configs, passwords, etc.</p>
+<p>We have multiple places that we should consider: <code>/usr/bin/httpd</code> This binary corresponds to working internally with a web service, which gives admin control, and also <code>/etc/init.d/rcS</code> An initial script that runs scripts and initialises the router to run correctly.</p>
+<h2 id="emulating-firmware-with-qemu">Emulating Firmware with QEMU</h2>
+<p>Probably, more people say that emulating is not that hard, it seems to be; it is like “just emulating with QEMU”, I assure you, it is more complicated than you think. Let’s show it step by step</p>
+<h3 id="what-is-qemu"><strong>What Is QEMU?</strong></h3>
+<p>QEMU (Quick Emulator) is an open-source machine emulator and virtualizer that runs software designed for one hardware architecture on a completely different system. Unlike traditional virtual machines that rely on the host CPU’s native instructions, QEMU can fully emulate processors such as <strong>ARM</strong>, <strong>MIPS</strong>, <strong>PowerPC</strong>, <strong>x86</strong>, <strong>RISC-V</strong>, and more. This makes it invaluable when analyzing embedded devices, whose firmware often targets architectures your laptop or server does not natively support.</p>
+<p>Under the hood, QEMU translates guest-architecture instructions into host instructions using a dynamic binary translator, in other words, JIT. It also emulates memory, peripherals, storage devices, and network interfaces, providing enough of a “fake hardware environment” for many operating systems (including embedded Linux-based firmwares) to boot.</p>
+<p>Because QEMU is open-source, widely supported, and highly flexible, it has become the standard tool for researchers, reverse engineers, and security analysts working with embedded systems.</p>
+<h2 id="how-to-identify-kernel-version-and-architecture">How to identify kernel version and architecture?</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>strings <span style="color:#bd93f9">10400</span> <span style="color:#ff79c6">|</span> grep Linux 
+</span></span><span style="display:flex;"><span>Linux version <span style="color:#bd93f9">2.6.36</span> (jenkins@sohoicilinux4) (gcc version <span style="color:#bd93f9">4.6.3</span> (Buildroot <span style="color:#bd93f9">2012.11.1</span>) )
+</span></span></code></pre></div><p>By <code>strings</code> and <code>grep</code> We get the exact version of Linux. The next step is to identify the architecture to emulate precisely.</p>
+<p>By the <code>file</code> command, we get all the information about the file</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>file bin<span style="color:#ff79c6">/</span>busybox 
+</span></span><span style="display:flex;"><span>bin<span style="color:#ff79c6">/</span>busybox<span style="color:#ff79c6">:</span> ELF <span style="color:#bd93f9">32</span><span style="color:#ff79c6">-</span>bit LSB executable, MIPS, MIPS32 rel2 version <span style="color:#bd93f9">1</span> (SYSV), dynamically linked, interpreter <span style="color:#ff79c6">/</span>lib<span style="color:#ff79c6">/</span>ld<span style="color:#ff79c6">-</span>uClibc.so<span style="color:#bd93f9">.0</span>, stripped
+</span></span><span style="display:flex;"><span>file usr<span style="color:#ff79c6">/</span>bin<span style="color:#ff79c6">/</span>httpd 
+</span></span><span style="display:flex;"><span>usr<span style="color:#ff79c6">/</span>bin<span style="color:#ff79c6">/</span>httpd<span style="color:#ff79c6">:</span> ELF <span style="color:#bd93f9">32</span><span style="color:#ff79c6">-</span>bit LSB executable, MIPS, MIPS32 rel2 version <span style="color:#bd93f9">1</span> (SYSV), dynamically linked, interpreter <span style="color:#ff79c6">/</span>lib<span style="color:#ff79c6">/</span>ld<span style="color:#ff79c6">-</span>uClibc.so<span style="color:#bd93f9">.0</span>, stripped
+</span></span></code></pre></div><p>You can download all the necessary images from these sources:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>wget https<span style="color:#ff79c6">:</span><span style="color:#6272a4">//people.debian.org/~aurel32/qemu/mipsel/debian_wheezy_mipsel_standard.qcow2
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>wget https<span style="color:#ff79c6">:</span><span style="color:#6272a4">//people.debian.org/~aurel32/qemu/mipsel/vmlinux-2.6.32-5-4kc-malta
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>wget https<span style="color:#ff79c6">:</span><span style="color:#6272a4">//people.debian.org/~aurel32/qemu/mipsel/vmlinux-3.2.0-4-4kc-malta
+</span></span></span></code></pre></div><p>When emulating router firmware, QEMU becomes the bridge between embedded hardware and your analysis environment. A command like the one below may look dense, but its structure is simple once you understand the role of each component:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>sudo qemu<span style="color:#ff79c6">-</span>system<span style="color:#ff79c6">-</span>mipsel <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>M malta <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>kernel vmlinux<span style="color:#ff79c6">-</span><span style="color:#bd93f9">2.6.32</span><span style="color:#ff79c6">-</span><span style="color:#bd93f9">5</span><span style="color:#ff79c6">-</span><span style="color:#bd93f9">4</span>kc<span style="color:#ff79c6">-</span>malta <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>hda debian_squeeze_mipsel_standard.qcow2 <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>append <span style="color:#f1fa8c">&#34;root=/dev/sda1 console=ttyS0 nokaslr&#34;</span> <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>net nic,model<span style="color:#ff79c6">=</span>e1000 <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>net user,hostfwd<span style="color:#ff79c6">=</span>tcp<span style="color:#ff79c6">::</span><span style="color:#bd93f9">8080</span><span style="color:#ff79c6">-:</span><span style="color:#bd93f9">80</span>,hostfwd<span style="color:#ff79c6">=</span>tcp<span style="color:#ff79c6">::</span><span style="color:#bd93f9">8443</span><span style="color:#ff79c6">-:</span><span style="color:#bd93f9">443</span>,hostfwd<span style="color:#ff79c6">=</span>tcp<span style="color:#ff79c6">::</span><span style="color:#bd93f9">2222</span><span style="color:#ff79c6">-:</span><span style="color:#bd93f9">22</span> <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>nographic <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>m <span style="color:#bd93f9">256</span>M
+</span></span></code></pre></div><p>At its core, this command tells QEMU to boot a little-endian MIPS system using the <strong>Malta reference board</strong>, a platform that Linux kernels support extremely well. The supplied <code>vmlinux</code> file is the compiled kernel that will run inside the emulator, while the QCOW2 disk image acts as the virtual machine’s storage. I depends, also an initial RAM disk Image (initrd).</p>
+<p>Boot arguments define how the system starts:</p>
+<ul>
+<li><code>root=/dev/sda1</code> points the kernel to the root filesystem,</li>
+<li><code>console=ttyS0</code> ensures all output goes to the serial console,</li>
+<li><code>nokaslr</code> disables memory randomization for easier debugging.</li>
+</ul>
+<p>Networking is handled through a virtual <strong>Intel e1000 NIC</strong>, paired with QEMU’s user-mode network stack. Port forwarding allows convenient access to services inside the VM from your host, HTTP on port 8080, HTTPS on 8443, and SSH on 2222. Running with <code>-nographic</code> drops the graphical window entirely and gives a pure serial terminal, which is precisely how most embedded systems communicate. Memory is capped at a lightweight 256 MB, keeping the environment realistic for router-class hardware.</p>
+<p>With just these flags, QEMU transforms into a fully functional MIPS test bench, perfect for firmware analysis, service emulation, and controlled experimentation without touching the actual device.</p>
+<p><img src="image%203.png" alt="image.png"></p>
+<p>As shown in the screenshot, we enter with credentials <code>root:root</code></p>
+<p>Of course, there is nothing, because we didn’t transfer any files from our userland squashedfs to QEMU.</p>
+<h2 id="directly-emulating-separate-parts-of-firmware">Directly emulating separate parts of firmware</h2>
+<p>In rare cases, you can emulate binary (extracted firmware) itself, if it doesn’t have dependencies that require unique libraries or environment, by the command:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span># Run binaries directly <span style="color:#8be9fd;font-style:italic">with</span> qemu<span style="color:#ff79c6">-</span>mipsel<span style="color:#ff79c6">-</span><span style="color:#ff79c6">static</span>
+</span></span><span style="display:flex;"><span>qemu<span style="color:#ff79c6">-</span>mipsel<span style="color:#ff79c6">-</span><span style="color:#ff79c6">static</span> <span style="color:#ff79c6">-</span>L squashfs<span style="color:#ff79c6">-</span>root<span style="color:#ff79c6">/</span> squashfs<span style="color:#ff79c6">-</span>root<span style="color:#ff79c6">/</span>bin<span style="color:#ff79c6">/</span>sh
+</span></span><span style="display:flex;"><span># $ echo <span style="color:#f1fa8c">&#34;worked&#34;</span>
+</span></span><span style="display:flex;"><span># worked
+</span></span><span style="display:flex;"><span># Or <span style="color:#ff79c6">for</span> specific programs, <span style="color:#ff79c6">in</span> rare cases works, <span style="color:#ff79c6">in</span> our <span style="color:#ff79c6">case</span> not
+</span></span><span style="display:flex;"><span>qemu<span style="color:#ff79c6">-</span>mips<span style="color:#ff79c6">-</span><span style="color:#ff79c6">static</span> <span style="color:#ff79c6">-</span>L squashfs<span style="color:#ff79c6">-</span>root<span style="color:#ff79c6">/</span> squashfs<span style="color:#ff79c6">-</span>root<span style="color:#ff79c6">/</span>usr<span style="color:#ff79c6">/</span>sbin<span style="color:#ff79c6">/</span>httpd
+</span></span></code></pre></div><h3 id="ways-to-move-files-from-the-host-to-the-vm">Ways to move files from the Host to the VM.</h3>
+<p>Unfortunately, you can’t drag and drop files like in VirtualBox or VMware. In QEMU, you have several safe ways of moving files into a VM.</p>
+<h3 id="port-forwarded-ssh">Port-forwarded SSH</h3>
+<p>One of the safest and easiest ways of moving files is via SSH.</p>
+<p>First, make sure you forwarded the port from the VM to the HOST with the right flag:</p>
+<p><code>-net user ... hostfwd=tcp::2222-:22</code></p>
+<p>And with the command, you can connect to SSH:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>ssh <span style="color:#ff79c6">-</span>p <span style="color:#bd93f9">2222</span> root@localhost <span style="color:#ff79c6">-</span>o HostKeyAlgorithms<span style="color:#ff79c6">=+</span>ssh<span style="color:#ff79c6">-</span>rsa
+</span></span></code></pre></div><p>And with the command, we move all files:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>scp <span style="color:#ff79c6">-</span>r <span style="color:#ff79c6">-</span>P <span style="color:#bd93f9">2222</span> <span style="color:#ff79c6">-</span>o HostKeyAlgorithms<span style="color:#ff79c6">=+</span>ssh<span style="color:#ff79c6">-</span>rsa <span style="color:#ff79c6">/</span>home<span style="color:#ff79c6">/</span>somename<span style="color:#ff79c6">/</span>Projects<span style="color:#ff79c6">/</span>router<span style="color:#ff79c6">/</span>tplink<span style="color:#ff79c6">/</span>_firmware.bin.extracted<span style="color:#ff79c6">/</span>squashfs<span style="color:#ff79c6">-</span>root     root@localhost<span style="color:#ff79c6">:</span>/root/firmware/
+</span></span></code></pre></div><p>Before running the <code>rcS</code> or <code>httpd</code></p>
+<h3 id="using-9p-filesystem-shared-folder">Using 9p Filesystem (Shared Folder)</h3>
+<p>This is the configuration of script.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>qemu<span style="color:#ff79c6">-</span>system<span style="color:#ff79c6">-</span>mipsel <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>M malta <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>kernel vmlinux<span style="color:#ff79c6">-</span><span style="color:#bd93f9">3.2.0</span><span style="color:#ff79c6">-</span><span style="color:#bd93f9">4</span><span style="color:#ff79c6">-</span><span style="color:#bd93f9">4</span>kc<span style="color:#ff79c6">-</span>malta <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>append <span style="color:#f1fa8c">&#34;nokaslr root=/dev/sda1&#34;</span> <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>hda debian_wheezy_mipsel_standard.qcow2 <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>virtfs local,path<span style="color:#ff79c6">=</span>/path/to/squashfs-root,mount_tag=host0,security_model=passthrough,id=host0 \
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>net nic <span style="color:#ff79c6">-</span>net user <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>nographic
+</span></span></code></pre></div><p><code>-virtfs local,path=/path/to/squashfs-root,mount_tag=host0,security_model=passthrough,id=host0 \</code></p>
+<p>And inside the QEMU:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>mkdir <span style="color:#ff79c6">/</span>mnt<span style="color:#ff79c6">/</span>host
+</span></span><span style="display:flex;"><span>mount <span style="color:#ff79c6">-</span>t <span style="color:#bd93f9">9</span>p <span style="color:#ff79c6">-</span>o trans<span style="color:#ff79c6">=</span>virtio,version<span style="color:#ff79c6">=</span><span style="color:#bd93f9">9</span>p2000.L host0 <span style="color:#ff79c6">/</span>mnt<span style="color:#ff79c6">/</span>host
+</span></span><span style="display:flex;"><span>cp <span style="color:#ff79c6">-</span>r <span style="color:#ff79c6">/</span>mnt<span style="color:#ff79c6">/</span>host<span style="color:#ff79c6">/*</span> /tmp/firmware/
+</span></span></code></pre></div><p>Note: This method isn’t supported by the Kernel version currently used in our testcase; it&rsquo;s intended for a more modern Kernel version.</p>
+<h3 id="attach-firmware-as-second-disk">Attach Firmware as Second Disk</h3>
+<p>Create a disk image with your firmware</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>dd <span style="color:#ff79c6">if</span><span style="color:#ff79c6">=</span>/dev/zero of=firmware.img bs=1M count=200
+</span></span><span style="display:flex;"><span>mkfs.ext4 firmware.img
+</span></span></code></pre></div><p>Mount and copy firmware</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>sudo mkdir <span style="color:#ff79c6">-</span>p <span style="color:#ff79c6">/</span>mnt<span style="color:#ff79c6">/</span>firmware<span style="color:#ff79c6">-</span>disk
+</span></span><span style="display:flex;"><span>sudo mount firmware.img <span style="color:#ff79c6">/</span>mnt<span style="color:#ff79c6">/</span>firmware<span style="color:#ff79c6">-</span>disk
+</span></span><span style="display:flex;"><span>sudo cp <span style="color:#ff79c6">-</span>r squashfs<span style="color:#ff79c6">-</span>root<span style="color:#ff79c6">/*</span> /mnt/firmware-disk/
+</span></span><span style="display:flex;"><span>sudo umount <span style="color:#ff79c6">/</span>mnt<span style="color:#ff79c6">/</span>firmware<span style="color:#ff79c6">-</span>disk
+</span></span></code></pre></div><p>Start QEMU with the firmware disk attached</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>sudo qemu<span style="color:#ff79c6">-</span>system<span style="color:#ff79c6">-</span>mipsel <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>M malta <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>kernel vmlinux<span style="color:#ff79c6">-</span><span style="color:#bd93f9">3.2.0</span><span style="color:#ff79c6">-</span><span style="color:#bd93f9">4</span><span style="color:#ff79c6">-</span><span style="color:#bd93f9">4</span>kc<span style="color:#ff79c6">-</span>malta <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>append <span style="color:#f1fa8c">&#34;nokaslr root=/dev/sda1&#34;</span> <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>hda debian_wheezy_mipsel_standard.qcow2 <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>hdb firmware.img <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>net nic <span style="color:#ff79c6">-</span>net user <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#ff79c6">-</span>nographic
+</span></span></code></pre></div><h2 id="preparing-the-environment-for-emulation">Preparing the environment for emulation</h2>
+<p>Before starting the VM, we must prepare the host networking so that QEMU can communicate with the local machine. QEMU interacts with the host through <strong>TUN/TAP interfaces</strong>, where <code>/dev/net/tun</code> is exposed as a file descriptor and <code>tap0</code> behaves like a virtual NIC attached to the host network stack. To support this, we create a <strong>bridge interface (br0)</strong> on the host, then connect both the host NIC and the TAP interface to it.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>sudo apt<span style="color:#ff79c6">-</span>get install bridge<span style="color:#ff79c6">-</span>utils
+</span></span><span style="display:flex;"><span>sudo apt<span style="color:#ff79c6">-</span>get install uml<span style="color:#ff79c6">-</span>utilities
+</span></span></code></pre></div><p>Set up the bridge and attach your physical interface (replace <code>eno2</code> with your actual NIC):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>ifconfig eno2 down
+</span></span><span style="display:flex;"><span>brctl addbr br0
+</span></span><span style="display:flex;"><span>brctl addif br0 eno2
+</span></span><span style="display:flex;"><span>brctl stp br0 on
+</span></span><span style="display:flex;"><span>brctl setfd br0 <span style="color:#bd93f9">2</span>
+</span></span><span style="display:flex;"><span>brctl sethello br0 <span style="color:#bd93f9">1</span>
+</span></span><span style="display:flex;"><span>ifconfig br0 <span style="color:#bd93f9">0.0.0.0</span> promisc up
+</span></span><span style="display:flex;"><span>ifconfig eno2 <span style="color:#bd93f9">0.0.0.0</span> promisc up
+</span></span><span style="display:flex;"><span>dhclient br0
+</span></span></code></pre></div><p>You can verify the bridge using:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>brctl show br0
+</span></span><span style="display:flex;"><span>brctl showstp br0
+</span></span></code></pre></div><p>Next, create and configure the TAP interface:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>tunctl <span style="color:#ff79c6">-</span>t tap0
+</span></span><span style="display:flex;"><span>brctl addif br0 tap0
+</span></span><span style="display:flex;"><span>ifconfig tap0 <span style="color:#bd93f9">0.0.0.0</span> promisc up
+</span></span><span style="display:flex;"><span>ifconfig tap0 <span style="color:#bd93f9">192.168.1.1</span><span style="color:#ff79c6">/</span><span style="color:#bd93f9">24</span> up  # subnet    
+</span></span></code></pre></div><p>Recheck the bridge status:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>brctl showstp br0
+</span></span></code></pre></div><p>With this networking setup in place, QEMU can attach the firmware’s virtual NIC to <code>tap0</code>, enabling real interaction between the emulated router and your host system, just like the physical router would behave on your network.</p>
+<p>And inside the VM, you need to assign an IP address manually if DHCP doesn&rsquo;t assign one.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>brctl addbr br0                       
+</span></span><span style="display:flex;"><span>ifconfig br0 <span style="color:#bd93f9">192.168.1</span>.x<span style="color:#ff79c6">/</span><span style="color:#bd93f9">24</span> up # x should be <span style="color:#ff79c6">in</span> subnet      
+</span></span></code></pre></div><p>If we open the firmware folder, which was transferred in <code>/root/firmware</code> in VM. We have found that all folders have been fully transferred. Next, we must bind-mount the VMs <code>/proc</code>, <code>/dev</code>, and <code>/sys</code> directories into the extracted firmware’s filesystem.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>mount <span style="color:#ff79c6">-</span>o bind <span style="color:#ff79c6">/</span>proc proc<span style="color:#ff79c6">/</span>
+</span></span><span style="display:flex;"><span>mount <span style="color:#ff79c6">-</span>o bind <span style="color:#ff79c6">/</span>sys sys<span style="color:#ff79c6">/</span>
+</span></span><span style="display:flex;"><span>mount <span style="color:#ff79c6">-</span>o bind <span style="color:#ff79c6">/</span>dev dev<span style="color:#ff79c6">/</span>
+</span></span></code></pre></div><p>Once those system paths are mapped correctly, we can switch into the firmware environment using <code>chroot</code></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>chroot squashfs<span style="color:#ff79c6">-</span>root<span style="color:#ff79c6">/</span> /bin/sh
+</span></span></code></pre></div><p>You probably think it is all good, and we are ready to run the script from <code>/etc/init.d/rcS</code> . And we can move into <code>/etc/rc.d</code> or <code>/etc/init.d</code> and manually launch the relevant startup scripts to bring up userland services. It’s essential to thoroughly examine the contents of the <code>rcS</code> directory. BUT, it fails.</p>
+<p>Every firmware behaves differently; these scripts often require adjustments to account for missing network devices, broken NVRAM calls, and other quirks. Sometimes you will spend weeks emulating properly. And in the process of searching for the solutions to your bugs, you hit the GitHub issues, where they have already been discussed, and they have been resolved. And for yourself, you discover a couple of excellent tools that can partially emulate your firmware.</p>
+<h1 id="firmadyne"><strong>Firmadyne</strong></h1>
+<p><img src="image%204.png" alt="image.png"></p>
+<p>Firmadyne can be incredibly helpful when everything lines up. It’s an automated framework designed to emulate Linux-based device firmware and supports both MIPS and ARM architectures. The tool handles root filesystem extraction, guesses network interfaces, constructs a QEMU disk image, and even emulates NVRAM behavior.</p>
+<p>If you&rsquo;re approaching a new firmware target and want full-system emulation, Firmadyne is worth trying first. You can patch some of its quirks or errors before resorting to manual emulation methods. One thing to note: newer QEMU versions sometimes cause unpredictable issues. Running Firmadyne inside Docker typically bypasses these compatibility problems.</p>
+<h3 id="arm-x"><strong>ARM-X</strong></h3>
+<p><img src="image%205.png" alt="image.png"></p>
+<p>ARM-X is another firmware emulation toolkit, but specifically focused on ARM-based devices. It bundles together a set of kernels, scripts, and prepared filesystems to help boot ARM firmware inside QEMU. The framework also includes several sample configurations you can use as starting templates for different devices.</p>
+<h1 id="emulating-tp-link-router-firmware-with-firmadyne">Emulating TP-Link Router Firmware with Firmadyne</h1>
+<p>Firmadyne automates router firmware emulation by handling extraction, architecture detection, kernel selection, and network setup automatically. Here&rsquo;s the corrected workflow.</p>
+<h2 id="quick-setup">Quick Setup</h2>
+<p>Install dependencies and clone Firmadyne</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#6272a4"># Install required packages</span>
+</span></span><span style="display:flex;"><span>sudo apt-get update
+</span></span><span style="display:flex;"><span>sudo apt-get install -y busybox-static fakeroot git dmsetup kpartx netcat-openbsd <span style="color:#f1fa8c">\
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c"></span>    nmap python3-psycopg2 python3-pip snmp uml-utilities util-linux vlan <span style="color:#f1fa8c">\
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c"></span>    qemu-system-arm qemu-system-mips qemu-system-x86 qemu-utils postgresql
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">cd</span> ~
+</span></span><span style="display:flex;"><span>git clone --recursive https://github.com/firmadyne/firmadyne.git
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">cd</span> firmadyne
+</span></span></code></pre></div><h2 id="database-configuration">Database Configuration</h2>
+<p>Create a PostgreSQL user and database (Password: firmadyn)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>sudo -u postgres createuser -P firmady
+</span></span><span style="display:flex;"><span>sudo -u postgres createdb -O firmadyne firmware
+</span></span><span style="display:flex;"><span>sudo -u postgres psql -d firmware &lt; ./database/schema
+</span></span></code></pre></div><p>Configure Firmadyne paths:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>nano firmadyne.config
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">FIRMWARE_DIR</span><span style="color:#ff79c6">=</span>/home/yourusername/firmadyne/
+</span></span></code></pre></div><h2 id="download-pre-built-kernels">Download Pre-built Kernels</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">cd</span> ~/firmadyne
+</span></span><span style="display:flex;"><span>./download.sh
+</span></span></code></pre></div><h2 id="extract-and-emulate-firmware">Extract and Emulate Firmware</h2>
+<p>Extract firmware filesystem:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>python3 .<span style="color:#ff79c6">/</span>sources<span style="color:#ff79c6">/</span>extractor<span style="color:#ff79c6">/</span>extractor.py <span style="color:#ff79c6">-</span>b Netgear <span style="color:#ff79c6">-</span>sql <span style="color:#bd93f9">127.0.0.1</span> <span style="color:#ff79c6">-</span>np <span style="color:#ff79c6">-</span>nk <span style="color:#ff79c6">\</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f1fa8c">&#34;TL-WR841Nv14.bin&#34;</span> images
+</span></span></code></pre></div><p>Identify architecture</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>.<span style="color:#ff79c6">/</span>scripts<span style="color:#ff79c6">/</span>getArch.sh .<span style="color:#ff79c6">/</span>images<span style="color:#ff79c6">/</span><span style="color:#bd93f9">1.</span>tar.gz
+</span></span></code></pre></div><p>Store filesystem in database</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>.<span style="color:#ff79c6">/</span>scripts<span style="color:#ff79c6">/</span>tar2db.py <span style="color:#ff79c6">-</span>i <span style="color:#bd93f9">1</span> <span style="color:#ff79c6">-</span>f .<span style="color:#ff79c6">/</span>images<span style="color:#ff79c6">/</span><span style="color:#bd93f9">1.</span>tar.gz
+</span></span></code></pre></div><p>Create QEMU disk image:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>sudo .<span style="color:#ff79c6">/</span>scripts<span style="color:#ff79c6">/</span>makeImage.sh <span style="color:#bd93f9">1</span>
+</span></span></code></pre></div><p>Infer network configuration and run the emulation</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-jsx" data-lang="jsx"><span style="display:flex;"><span>.<span style="color:#ff79c6">/</span>scripts<span style="color:#ff79c6">/</span>inferNetwork.sh <span style="color:#bd93f9">1</span>
+</span></span><span style="display:flex;"><span>sudo .<span style="color:#ff79c6">/</span>scratch<span style="color:#ff79c6">/</span><span style="color:#bd93f9">1</span><span style="color:#ff79c6">/</span>run.sh
+</span></span></code></pre></div><h2 id="understanding-the-scratch-directory">Understanding the Scratch Directory</h2>
+<p>After running <code>makeImage.sh</code>, Firmadyne creates a <code>scratch</code> directory with your image ID. The structure looks like:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-fallback" data-lang="fallback"><span style="display:flex;"><span>firmadyne/
+</span></span><span style="display:flex;"><span>├── scratch/
+</span></span><span style="display:flex;"><span>│   └── 1/              # Your image ID
+</span></span><span style="display:flex;"><span>│       ├── run.sh      # Script to run emulation
+</span></span><span style="display:flex;"><span>│       ├── image.raw   # QEMU disk image
+</span></span><span style="display:flex;"><span>│       └── ...
+</span></span></code></pre></div><h2 id="accessing-the-emulated-router">Accessing the Emulated Router</h2>
+<p>After running <code>sudo ./scratch/1/run.sh</code>, the output shows the network configuration:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-fallback" data-lang="fallback"><span style="display:flex;"><span>IP Address: 192.168.0.1
+</span></span><span style="display:flex;"><span>Web Interface: http://192.168.0.1
+</span></span></code></pre></div><p>From another terminal, check if it accesable:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>ping 192.168.0.1
+</span></span><span style="display:flex;"><span>curl http://192.168.0.1
+</span></span></code></pre></div><h2 id="alternative-if-fails-using-firmae">Alternative if fails: Using FirmAE</h2>
+<p>FirmAE is an enhanced version that works better with modern firmware Clone, Install, and Run:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#6272a4"># Clone FirmAE</span>
+</span></span><span style="display:flex;"><span>git clone --recursive https://github.com/pr0v3rbs/FirmAE.git
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">cd</span> FirmAE
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4"># Install (handles all dependencies)</span>
+</span></span><span style="display:flex;"><span>./install.sh
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4"># Run firmware (single command does everything)</span>
+</span></span><span style="display:flex;"><span>./run.sh -r ~/TL-WR841Nv14_US_0.9.1_4.19_up_boot<span style="color:#ff79c6">[</span>250328-rel51324<span style="color:#ff79c6">]</span>_2025-03-28_14.16.58.bin
+</span></span></code></pre></div><h2 id="troubleshooting">Troubleshooting</h2>
+<p><strong>If scratch directory is not created:</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#6272a4"># Check if makeImage.sh succeeded</span>
+</span></span><span style="display:flex;"><span>ls -la scratch/
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4"># Check database for image</span>
+</span></span><span style="display:flex;"><span>psql -U firmadyne -d firmware -c <span style="color:#f1fa8c">&#34;SELECT * FROM image;&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4"># Manually check if tarball exists</span>
+</span></span><span style="display:flex;"><span>ls -la images/
+</span></span></code></pre></div><p><strong>If network is not accessible:</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#6272a4"># Check TAP interfaces</span>
+</span></span><span style="display:flex;"><span>ip addr show | grep tap
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4"># Check if QEMU is running</span>
+</span></span><span style="display:flex;"><span>ps aux | grep qemu
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4"># View network config from inferNetwork.sh output</span>
+</span></span><span style="display:flex;"><span>cat scratch/1/network.txt
+</span></span></code></pre></div><p><strong>If extraction fails:</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#6272a4"># Manually extract with binwalk</span>
+</span></span><span style="display:flex;"><span>binwalk -e TL-WR841Nv14*.bin
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4"># Create tarball manually</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">cd</span> _TL-WR841Nv14*.extracted
+</span></span><span style="display:flex;"><span>tar -czf ../manual.tar.gz squashfs-root/
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4"># Use manual tarball</span>
+</span></span><span style="display:flex;"><span>mv manual.tar.gz ~/firmadyne/images/1.tar.gz
+</span></span></code></pre></div><h2 id="complete-workflow-example">Complete Workflow Example</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">cd</span> ~/firmadyne
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4"># Extract (note the ID in output)</span>
+</span></span><span style="display:flex;"><span>python3 sources/extractor/extractor.py -b TPLink -sql 127.0.0.1 -np -nk <span style="color:#f1fa8c">\
+</span></span></span><span style="display:flex;"><span><span style="color:#f1fa8c"></span>    <span style="color:#f1fa8c">&#34;TL-WR841Nv14.bin&#34;</span> images
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4"># Assuming ID is 2</span>
+</span></span><span style="display:flex;"><span>./scripts/getArch.sh ./images/2.tar.gz
+</span></span><span style="display:flex;"><span>./scripts/tar2db.py -i <span style="color:#bd93f9">2</span> -f ./images/2.tar.gz
+</span></span><span style="display:flex;"><span>sudo ./scripts/makeImage.sh <span style="color:#bd93f9">2</span>
+</span></span><span style="display:flex;"><span>./scripts/inferNetwork.sh <span style="color:#bd93f9">2</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4"># Run emulation</span>
+</span></span><span style="display:flex;"><span>sudo ./scratch/2/run.sh
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#6272a4"># In another terminal, access router</span>
+</span></span><span style="display:flex;"><span>firefox http://192.168.0.1
+</span></span></code></pre></div><ul>
+<li><strong>extractor.py</strong>: Extracts filesystem using binwalk and creates tarball in <code>images/</code></li>
+<li><strong>getArch.sh</strong>: Identifies processor architecture (mips, mipsel, armel)</li>
+<li><strong>tar2db.py</strong>: Loads filesystem metadata into PostgreSQL database</li>
+<li><strong>makeImage.sh</strong>: Creates QEMU bootable disk image in <code>scratch/ID/</code></li>
+<li><strong>inferNetwork.sh</strong>: Analyzes network configuration and creates network setup</li>
+<li><strong>run.sh</strong>: Launches QEMU with proper kernel, network, and disk configuration</li>
+</ul>
+<p>The key difference from manual QEMU setup is that Firmadyne automates kernel selection, network bridge creation, and generates the complete QEMU command based on detected firmware characteristics. And finally we got our emulation:</p>
+<p><img src="image_2025-11-25_19-34-32.png" alt="image_2025-11-25_19-34-32.png"></p>
+<p>And also, we can freely reverse binaries from firmware in Ghidra</p>
+<p><img src="image%206.png" alt="image.png"></p>
+
+		</section>
+
+		<div class="post-tags">
+			
+			
+			<nav class="nav tags">
+				<ul class="tags">
+					
+					<li><a href="/tags/routers">routers</a></li>
+					
+					<li><a href="/tags/qemu">qemu</a></li>
+					
+					<li><a href="/tags/simulation">simulation</a></li>
+					
+					<li><a href="/tags/ghidra">ghidra</a></li>
+					
+					<li><a href="/tags/reverse">reverse</a></li>
+					
+					<li><a href="/tags/uart">UART</a></li>
+					
+					<li><a href="/tags/spi-dump">SPI dump</a></li>
+					
+				</ul>
+			</nav>
+			
+			
+		</div>
+		</article>
+</main>
+<footer>
+  <div style="display:flex"><a class="soc" href="https://github.com/arzedlab/" rel="me" title="GitHub"><i data-feather="github"></i></a>
+    <a class="border"></a><a class="soc" href="https://www.linkedin.com/in/ravshan-rikhsiev/" rel="me" title="Linkedin"><i data-feather="linkedin"></i></a>
+    <a class="border"></a><a class="soc" href="https://twitter.com/arzedlab/" rel="me" title="Twitter"><i data-feather="twitter"></i></a>
+    <a class="border"></a></div>
+  <div class="footer-info">
+    2025  © Ravshan | Made with Love ❤️ <a href="https://twitter.com/arzedlab/"> My Twitter 🪽</a>
+  </div>
+</footer>
+<script>
+  feather.replace()
+</script></div>
+    </body>
+</html>
