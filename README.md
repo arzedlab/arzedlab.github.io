@@ -1,4 +1,3 @@
----
 # ArzedLab Blog
 
 **arzedlab.github.io** is a personal blog where I share articles, thoughts, and research related to cybersecurity, technology, and the digital world. The blog is written for readers who are curious about how modern technology works, how cyber threats evolve, and what we can learn from real-world cases.
@@ -29,5 +28,3 @@ If you have feedback, suggestions, or would like to discuss a topic from the blo
 ## Disclaimer
 
 All content on this blog is published for educational and informational purposes only. Opinions expressed are personal and do not represent any organization or employer.
-
----
