@@ -64,7 +64,7 @@
 							alt="author"
 							style="width:320px;height:320px;object-fit:cover;border-radius:3px;flex-shrink:0;"
 						><div>
-							<h2>Ravshan Rikhsiev — Cybersecurity researcher | Low-level systems, firmware & reverse engineering</h2>
+							<h2>Ravshan Rikhsiev — Cybersecurity researcher | Low-level systems, firmware & compilers</h2>
 							<p style="margin:0;">
 								I’m a cybersecurity researcher at ONESEC focused on low-level systems, firmware, and compilers. I publish technical writeups, run hands-on workshops, and mentor students to help grow the next generation of security researchers. Outside work I enjoy cycling and community outreach.
 							</p>
@@ -271,6 +271,26 @@
   <div class="footer-info">
     2025  © Ravshan | Made with Love ❤️ <a href="https://twitter.com/arzedlab/"> My Twitter 🪽</a>
   </div>
+	<script src="/js/wasm_exec.js"></script>
+  	<script>
+    const go = new Go();
+
+    WebAssembly.instantiateStreaming(fetch("\/js\/main.wasm"), go.importObject)
+      .then(result => {
+        go.run(result.instance);
+      })
+      .catch(err => console.error("WASM error:", err));
+
+    
+    (function callReady() {
+      if (typeof collectVisitor === "function") {
+        try { collectVisitor(); console.log("collectVisitor called"); }
+        catch (e) { console.error("collectVisitor call failed:", e); }
+      } else {
+        setTimeout(callReady, 30);
+      }
+    })();
+  </script>
 </footer>
 <script>
   feather.replace()

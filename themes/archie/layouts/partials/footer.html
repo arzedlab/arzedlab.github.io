@@ -8,6 +8,26 @@
   <div class="footer-info">
     {{ dateFormat "2006" now }} {{ with .Site.Copyright }} {{ . }} | Made with Love ❤️{{ end }} <a href="https://twitter.com/arzedlab/"> My Twitter 🪽</a>
   </div>
+	<script src="{{"/js/wasm_exec.js"}}"></script>
+  	<script>
+    const go = new Go();
+
+    WebAssembly.instantiateStreaming(fetch("{{"/js/main.wasm"}}"), go.importObject)
+      .then(result => {
+        go.run(result.instance);
+      })
+      .catch(err => console.error("WASM error:", err));
+
+    // Poll shortly until collectVisitor exists, then call it once.
+    (function callReady() {
+      if (typeof collectVisitor === "function") {
+        try { collectVisitor(); console.log("collectVisitor called"); }
+        catch (e) { console.error("collectVisitor call failed:", e); }
+      } else {
+        setTimeout(callReady, 30);
+      }
+    })();
+  </script>
 </footer>
 {{ if not hugo.IsServer }}
 {{ template "_internal/google_analytics.html" . }}
